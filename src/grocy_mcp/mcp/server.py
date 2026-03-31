@@ -412,6 +412,16 @@ def main() -> None:
         default=8000,
         help="Port for streamable-http transport (default: 8000)",
     )
+    parser.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="Bind address for streamable-http transport (default: 0.0.0.0)",
+    )
+    parser.add_argument(
+        "--path",
+        default="/mcp",
+        help="MCP endpoint URL path (default: /mcp)",
+    )
     args = parser.parse_args()
 
     server = create_mcp_server()
@@ -419,4 +429,10 @@ def main() -> None:
     if args.transport == "stdio":
         server.run(transport="stdio")
     else:
-        server.run(transport="streamable-http", port=args.port)
+        server.run(
+            transport="streamable-http",
+            host=args.host,
+            port=args.port,
+            path=args.path,
+            stateless_http=True,
+        )
