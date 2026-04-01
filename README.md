@@ -7,7 +7,7 @@
 
 Python MCP server and CLI for [Grocy](https://grocy.info/).
 
-`grocy-mcp` lets AI agents and terminal users work with Grocy through one shared codebase. It exposes stock, shopping lists, recipes, chores, locations, tasks, meal plans, workflow preview/apply helpers, and generic entity management through:
+`grocy-mcp` lets AI agents and terminal users work with Grocy through one shared codebase. It exposes stock, shopping lists, recipes, chores, batteries, equipment, calendar exports, file groups, print helpers, workflow preview/apply helpers, discovery tools, and generic entity management through:
 
 - an MCP server for tools like Claude Desktop, Claude Code, and other MCP clients
 - a `grocy` CLI for direct command-line use
@@ -29,11 +29,15 @@ Grocy already has a solid REST API, but most day-to-day interactions still requi
 
 ## Features
 
-- 55 MCP tools across stock, shopping, recipes, chores, locations, tasks, meal plans, workflow helpers, and system operations
+- 89 MCP tools across stock, shopping, recipes, chores, locations, tasks, meal plans, batteries, equipment, calendar, files, print, discovery, workflow helpers, and system operations
 - Full Typer CLI with grouped subcommands under `grocy`
-- Name-based resolution for products, recipes, chores, and locations
+- Global `--json` mode for machine-readable output on the supported list/view/reporting commands
+- Top-level CLI config overrides via `--url` and `--api-key`
+- Name-based resolution for products, recipes, chores, locations, batteries, and equipment
 - Stable workflow-oriented JSON contracts for preview/apply flows driven by chat, OCR, or vision clients
 - Batch preview/apply helpers for product matching, stock intake, and shopping-list reconciliation
+- First-class catalog helpers for shopping metadata, quantity metadata, task categories, meal-plan sections, and price-history views
+- First-class household helpers for batteries, equipment, calendar summaries, file groups, print actions, and discovery
 - Streamable HTTP and stdio MCP transports
 - Async client layer with retry handling for transient server errors
 - Generic entity access for Grocy resources outside the dedicated commands
@@ -191,6 +195,7 @@ The MCP server currently supports:
 
 - `stdio`
 - `streamable-http`
+- 89 registered tools in the current implementation
 
 ## Agent workflow examples
 
@@ -317,6 +322,13 @@ grocy chores ...
 grocy locations ...
 grocy tasks ...
 grocy meal-plan ...
+grocy catalog ...
+grocy batteries ...
+grocy equipment ...
+grocy calendar ...
+grocy files ...
+grocy print ...
+grocy discover ...
 grocy workflow ...
 grocy system ...
 grocy entity ...
@@ -367,6 +379,23 @@ grocy --json workflow stock-intake-apply '[{"product_id":12,"amount":2}]'
 grocy --json workflow shopping-reconcile-preview '[{"product_id":12,"amount":2}]'
 grocy --json workflow shopping-reconcile-apply '[{"shopping_item_id":5,"action":"remove"}]'
 
+# Catalog and planning
+grocy --json catalog list shopping-lists
+grocy --json catalog list quantity-units
+grocy --json batteries list
+grocy --json batteries due --days 7
+grocy --json equipment list
+grocy --json meal-plan summary --from 2026-04-01 --to 2026-04-07
+grocy --json calendar summary --from 2026-04-01 --to 2026-04-07
+
+# Files, print, and discovery
+grocy --json files download productpictures milk.jpg
+grocy files upload recipepictures pancakes.jpg ./pancakes.jpg
+grocy print shopping-list-thermal
+grocy print product-label Milk
+grocy --json discover search products milk
+grocy --json discover describe-entity products_average_price
+
 # System / generic entities
 grocy system info
 grocy entity list products
@@ -385,6 +414,11 @@ src/grocy_mcp/
   models.py          pydantic models
   workflow_models.py stable workflow JSON contracts
   core/              shared business logic for MCP and CLI
+  core/batteries.py  battery views and charge-cycle actions
+  core/calendar.py   combined planning summaries and iCal helpers
+  core/equipment.py  equipment views with linked battery context
+  core/files.py      file-group download/upload/delete and print helpers
+  core/reference_data.py first-class metadata/discovery helpers
   core/workflows.py  preview/apply workflow helpers
   mcp/server.py      FastMCP entry point
   cli/app.py         Typer CLI entry point
@@ -449,6 +483,7 @@ Claude Desktop logs for error details.
 
 - [Changelog](./CHANGELOG.md)
 - [Roadmap](./ROADMAP.md)
+- [Support policy](./SUPPORT.md)
 - [Contributing](./CONTRIBUTING.md)
 - [Design and implementation notes](./docs/specs/)
 - [Workflow design](./docs/specs/2026-04-01-grocy-mcp-workflow-design.md)

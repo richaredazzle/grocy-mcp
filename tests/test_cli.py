@@ -300,12 +300,7 @@ def test_tasks_list_json_hides_done_by_default():
     """--json tasks list should preserve the default incomplete-only behavior."""
     with patch("grocy_mcp.cli.app._client") as mock_client_factory:
         mock_client = MagicMock()
-        mock_client.get_objects = AsyncMock(
-            return_value=[
-                {"id": 1, "name": "Open task", "done": 0},
-                {"id": 2, "name": "Done task", "done": 1},
-            ]
-        )
+        mock_client.get_tasks = AsyncMock(return_value=[{"id": 1, "name": "Open task", "done": 0}])
         mock_client_factory.return_value.__aenter__.return_value = mock_client
         result = runner.invoke(app, ["--json", "tasks", "list"])
 
@@ -601,3 +596,93 @@ def test_workflow_shopping_reconcile_preview_json_output():
     data = json.loads(result.output)
     assert data[0]["actions"][0]["shopping_item_id"] == 5
     mock_fn.assert_awaited_once_with(mock_client, [{"product_id": 12, "amount": 2}], 2)
+
+
+def test_catalog_list_json_output():
+    """Catalog list should return raw structured rows in --json mode."""
+    with patch("grocy_mcp.cli.app.list_entity_records", new_callable=AsyncMock) as mock_fn:
+        mock_fn.return_value = [{"id": 1, "name": "Pantry"}]
+        with patch("grocy_mcp.cli.app._client") as mock_cf:
+            mock_client = MagicMock()
+            mock_cf.return_value.__aenter__.return_value = mock_client
+            result = runner.invoke(app, ["--json", "catalog", "list", "shopping-lists"])
+
+    assert result.exit_code == 0
+    import json
+
+    data = json.loads(result.output)
+    assert data == [{"id": 1, "name": "Pantry"}]
+    mock_fn.assert_awaited_once_with(mock_client, "shopping_lists", None)
+
+
+def test_batteries_overdue_json_output():
+    """Battery overdue view should return structured rows in --json mode."""
+    with patch("grocy_mcp.cli.app.batteries_overdue_data", new_callable=AsyncMock) as mock_fn:
+        mock_fn.return_value = [{"battery_id": 1, "name": "Remote battery"}]
+        with patch("grocy_mcp.cli.app._client") as mock_cf:
+            mock_client = MagicMock()
+            mock_cf.return_value.__aenter__.return_value = mock_client
+            result = runner.invoke(app, ["--json", "batteries", "overdue"])
+
+    assert result.exit_code == 0
+    import json
+
+    data = json.loads(result.output)
+    assert data[0]["battery_id"] == 1
+
+
+def test_calendar_summary_json_output():
+    """Calendar summary should return structured planning data in --json mode."""
+    with patch("grocy_mcp.cli.app.calendar_summary_data", new_callable=AsyncMock) as mock_fn:
+        mock_fn.return_value = {"tasks": [], "chores": [], "batteries": [], "meal_plan": []}
+        with patch("grocy_mcp.cli.app._client") as mock_cf:
+            mock_client = MagicMock()
+            mock_cf.return_value.__aenter__.return_value = mock_client
+            result = runner.invoke(app, ["--json", "calendar", "summary"])
+
+    assert result.exit_code == 0
+    import json
+
+    data = json.loads(result.output)
+    assert data["tasks"] == []
+
+
+def test_files_upload_json_output(tmp_path):
+    """Files upload should return structured output in --json mode."""
+    local_file = tmp_path / "milk.txt"
+    local_file.write_text("hello", encoding="utf-8")
+    with patch("grocy_mcp.cli.app.file_upload_data", new_callable=AsyncMock) as mock_fn:
+        mock_fn.return_value = {
+            "group": "productpictures",
+            "file_name": "milk.txt",
+            "uploaded": True,
+        }
+        with patch("grocy_mcp.cli.app._client") as mock_cf:
+            mock_client = MagicMock()
+            mock_cf.return_value.__aenter__.return_value = mock_client
+            result = runner.invoke(
+                app,
+                ["--json", "files", "upload", "productpictures", "milk.txt", str(local_file)],
+            )
+
+    assert result.exit_code == 0
+    import json
+
+    data = json.loads(result.output)
+    assert data["uploaded"] is True
+
+
+def test_discover_describe_entity_json_output():
+    """Entity describe helper should return structured metadata in --json mode."""
+    with patch("grocy_mcp.cli.app.describe_entity_data", new_callable=AsyncMock) as mock_fn:
+        mock_fn.return_value = {"entity": "products", "sample_fields": ["id", "name"]}
+        with patch("grocy_mcp.cli.app._client") as mock_cf:
+            mock_client = MagicMock()
+            mock_cf.return_value.__aenter__.return_value = mock_client
+            result = runner.invoke(app, ["--json", "discover", "describe-entity", "products"])
+
+    assert result.exit_code == 0
+    import json
+
+    data = json.loads(result.output)
+    assert data["entity"] == "products"

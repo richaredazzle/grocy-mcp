@@ -104,3 +104,85 @@ async def test_workflow_match_products_preview_tool_returns_structured_data(monk
     preview = result.structured_content["result"]
     assert preview[0]["status"] == "matched"
     assert preview[0]["matched_product_id"] == 12
+
+
+async def test_catalog_list_tool_returns_structured_data(monkeypatch):
+    mcp = create_mcp_server()
+
+    @asynccontextmanager
+    async def fake_client():
+        class Client:
+            async def get_objects(self, entity: str):
+                assert entity == "shopping_lists"
+                return [{"id": 1, "name": "Weekly"}]
+
+        yield Client()
+
+    monkeypatch.setattr("grocy_mcp.mcp.server._get_client", fake_client)
+
+    result = await mcp.call_tool("catalog_list_tool", {"entity": "shopping_lists"})
+
+    rows = result.structured_content["result"]
+    assert rows == [{"id": 1, "name": "Weekly"}]
+
+
+async def test_calendar_summary_tool_returns_structured_data(monkeypatch):
+    mcp = create_mcp_server()
+
+    @asynccontextmanager
+    async def fake_client():
+        class Client:
+            async def get_tasks(self):
+                return [{"id": 1, "name": "Buy milk", "due_date": "2026-04-05"}]
+
+            async def get_chores(self):
+                return []
+
+            async def get_batteries(self):
+                return []
+
+            async def get_objects(self, entity: str):
+                if entity == "meal_plan":
+                    return []
+                if entity == "recipes":
+                    return []
+                return []
+
+        yield Client()
+
+    monkeypatch.setattr("grocy_mcp.mcp.server._get_client", fake_client)
+
+    result = await mcp.call_tool("calendar_summary_tool", {})
+
+    summary = result.structured_content.get("result", result.structured_content)
+    assert summary["tasks"][0]["id"] == 1
+
+
+async def test_file_download_tool_returns_base64(monkeypatch):
+    mcp = create_mcp_server()
+
+    @asynccontextmanager
+    async def fake_client():
+        class Client:
+            async def download_file(
+                self,
+                group: str,
+                file_name_b64: str,
+                force_serve_as=None,
+                best_fit_width=None,
+                best_fit_height=None,
+            ):
+                return b"hello", "text/plain"
+
+        yield Client()
+
+    monkeypatch.setattr("grocy_mcp.mcp.server._get_client", fake_client)
+
+    result = await mcp.call_tool(
+        "file_download_tool",
+        {"group": "productpictures", "file_name": "milk.jpg"},
+    )
+
+    payload = result.structured_content.get("result", result.structured_content)
+    assert payload["group"] == "productpictures"
+    assert payload["content_type"] == "text/plain"

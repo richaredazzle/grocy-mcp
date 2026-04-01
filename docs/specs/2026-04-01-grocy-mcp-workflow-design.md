@@ -185,9 +185,13 @@ Pantry audit flow:
 2. Call `workflow_match_products_preview`
 3. Review matches without mutating Grocy
 
-## Notes for Future Checkpoints
+## Relationship To The Broader Surface
 
-- richer vision flows stay outside this repo
-- batteries, equipment, shopping metadata, and discovery helpers remain later checkpoints
-- if a future checkpoint introduces additional stable JSON contracts, this document
-  should be updated in the same PR
+The broader roadmap checkpoints for batteries, equipment, shopping metadata,
+calendar, files, print, and discovery are now implemented elsewhere in the
+codebase and documented in the current design/implementation docs.
+
+This document remains narrowly focused on the stable workflow JSON layer.
+
+If a future change introduces additional stable workflow contracts, this
+document should be updated in the same PR.
