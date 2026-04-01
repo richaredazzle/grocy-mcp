@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from html.parser import HTMLParser
+import time
 from urllib.parse import urljoin
 
 import httpx
@@ -79,17 +80,40 @@ class GrocySessionClient:
                 return urljoin(str(response.url), form.get("action") or str(response.url)), payload
         raise RuntimeError("Could not discover a Grocy login form.")
 
-    def login(self) -> None:
-        action, payload = self._discover_login_form()
-        response = self.client.post(action, data=payload)
-        response.raise_for_status()
-        check = self.client.get(
-            f"{self.base_url}/api/system/info", headers={"Accept": "application/json"}
-        )
-        if check.status_code >= 400:
-            raise RuntimeError(
-                f"Grocy session login succeeded but API access failed ({check.status_code})."
-            )
+    def login(self, retries: int = 20, retry_delay: float = 2.0) -> None:
+        last_error: Exception | None = None
+        for attempt in range(retries + 1):
+            try:
+                action, payload = self._discover_login_form()
+                response = self.client.post(action, data=payload)
+                response.raise_for_status()
+                check = self.client.get(
+                    f"{self.base_url}/api/system/info", headers={"Accept": "application/json"}
+                )
+                if check.status_code >= 400:
+                    raise RuntimeError(
+                        f"Grocy session login succeeded but API access failed ({check.status_code})."
+                    )
+                return
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code < 500 or attempt >= retries:
+                    raise
+                last_error = exc
+            except httpx.HTTPError as exc:
+                if attempt >= retries:
+                    raise
+                last_error = exc
+            except RuntimeError as exc:
+                if (
+                    not str(exc).startswith("Could not discover a Grocy login form.")
+                    or attempt >= retries
+                ):
+                    raise
+                last_error = exc
+            time.sleep(retry_delay)
+        raise RuntimeError(
+            "Grocy session login failed after transient startup retries."
+        ) from last_error
 
     def api_request(self, method: str, path: str, **kwargs) -> httpx.Response:
         headers = {"Accept": "application/json", **kwargs.pop("headers", {})}

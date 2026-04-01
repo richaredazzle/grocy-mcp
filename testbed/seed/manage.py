@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+import sqlite3
 import subprocess
 import time
 from pathlib import Path
@@ -65,14 +66,36 @@ def compose_up(config: TestbedConfig) -> None:
     )
 
 
-def wait_for_grocy(base_url: str, timeout: int = 120) -> None:
+def _database_ready(database_path: Path) -> bool:
+    if not database_path.exists() or database_path.stat().st_size == 0:
+        return False
+    try:
+        with sqlite3.connect(database_path) as connection:
+            rows = connection.execute(
+                """
+                SELECT name
+                FROM sqlite_master
+                WHERE type = 'table'
+                  AND name IN ('migrations', 'users')
+                """
+            ).fetchall()
+    except sqlite3.Error:
+        return False
+    names = {str(row[0]) for row in rows}
+    return {"migrations", "users"}.issubset(names)
+
+
+def wait_for_grocy(base_url: str, database_path: Path, timeout: int = 120) -> None:
     deadline = time.time() + timeout
     last_error: Exception | None = None
     while time.time() < deadline:
         try:
-            response = httpx.get(base_url, follow_redirects=False, timeout=10.0)
-            if response.status_code in {200, 302, 303}:
+            response = httpx.get(base_url, follow_redirects=True, timeout=10.0)
+            if response.status_code == 200 and _database_ready(database_path):
                 return
+            last_error = RuntimeError(
+                "Grocy responded before the SQLite schema was fully initialized."
+            )
         except httpx.HTTPError as exc:
             last_error = exc
         time.sleep(2)
@@ -87,9 +110,18 @@ def _create_named_entities(
 ) -> tuple[dict[str, int], list[str]]:
     ids: dict[str, int] = {}
     warnings: list[str] = []
+    existing_by_name = {
+        " ".join(str(item.get("name", "")).casefold().split()): int(item["id"])
+        for item in session.get_objects(entity)
+        if item.get("name") and item.get("id")
+    }
     for item in items:
         payload = {key: value for key, value in item.items() if key != "name"}
         name = str(item["name"])
+        normalized_name = " ".join(name.casefold().split())
+        if normalized_name in existing_by_name:
+            ids[name] = existing_by_name[normalized_name]
+            continue
         try:
             ids[name] = session.create_object(entity, {"name": name, **payload})
         except Exception as exc:  # pragma: no cover - depends on live Grocy validation
@@ -206,12 +238,6 @@ def bootstrap_demo_household(config: TestbedConfig, seed_profile_path: Path) -> 
         ids["equipment"] = {}
         for item in profile.get("equipment", []):
             payload = {"name": item["name"], "description": item.get("description", "")}
-            battery = item.get("battery")
-            if battery:
-                payload["battery_id"] = ids["batteries"][battery]
-            location = item.get("location")
-            if location:
-                payload["location_id"] = ids["locations"][location]
             try:
                 ids["equipment"][item["name"]] = session.create_object("equipment", payload)
             except Exception as exc:  # pragma: no cover - live Grocy validation
@@ -228,7 +254,7 @@ def bootstrap_demo_household(config: TestbedConfig, seed_profile_path: Path) -> 
                 payload["recipe_id"] = ids["recipes"][recipe]
             section = item.get("section")
             if section:
-                payload["meal_plan_section_id"] = ids["meal_plan_sections"][section]
+                payload["section_id"] = ids["meal_plan_sections"][section]
             try:
                 session.create_object("meal_plan", payload)
             except Exception as exc:  # pragma: no cover - live Grocy validation
@@ -243,5 +269,8 @@ def ensure_demo_environment(config: TestbedConfig, seed_profile_path: Path) -> l
     compose_down(config)
     reset_runtime_dirs(config)
     compose_up(config)
-    wait_for_grocy(config.grocy_base_url)
+    wait_for_grocy(
+        config.grocy_base_url,
+        config.runtime_dir / "grocy-data" / "data" / "grocy.db",
+    )
     return bootstrap_demo_household(config, seed_profile_path)

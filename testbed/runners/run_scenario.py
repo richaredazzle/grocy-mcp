@@ -84,12 +84,31 @@ async def _product_map(client: GrocyClient) -> dict[str, int]:
     return {" ".join(item.get("name", "").casefold().split()): int(item["id"]) for item in products}
 
 
+async def _resolve_shopping_list_id(
+    client: GrocyClient,
+    manifest,
+    confirmation,
+) -> int | None:
+    list_name = manifest.source_metadata.get("shopping_list_name") or confirmation.shopping_list
+    if list_name:
+        shopping_lists = await client.get_objects("shopping_lists")
+        normalized_target = " ".join(str(list_name).casefold().split())
+        for item in shopping_lists:
+            item_name = " ".join(str(item.get("name", "")).casefold().split())
+            if item_name == normalized_target:
+                return int(item["id"])
+        raise RuntimeError(f"Shopping list '{list_name}' was not found in the demo environment.")
+    list_id = manifest.source_metadata.get("shopping_list_id")
+    return None if list_id is None else int(list_id)
+
+
 async def _receipt_stock_flow(
     mode: str,
     manifest,
     config: TestbedConfig,
     normalized_items: list[dict],
     confirmation,
+    shopping_list_id: int | None,
     mcp_transport: str,
 ) -> tuple[object, list[dict], list[dict]]:
     preview_output = None
@@ -108,16 +127,19 @@ async def _receipt_stock_flow(
             preview_output, normalized_items, confirmation, products_by_name
         )
         run_cli_json(config, ["workflow", "stock-intake-apply", json_dumps(apply_items)])
-        reconcile_preview = run_cli_json(
-            config,
-            [
-                "workflow",
-                "shopping-reconcile-preview",
-                json_dumps(apply_items),
-                "--list-id",
-                str(manifest.source_metadata.get("shopping_list_id", 1)),
-            ],
-        )
+        if shopping_list_id is None:
+            reconcile_preview = []
+        else:
+            reconcile_preview = run_cli_json(
+                config,
+                [
+                    "workflow",
+                    "shopping-reconcile-preview",
+                    json_dumps(apply_items),
+                    "--list-id",
+                    str(shopping_list_id),
+                ],
+            )
         apply_actions = flatten_shopping_actions(reconcile_preview)
         if apply_actions:
             run_cli_json(
@@ -138,6 +160,7 @@ async def _receipt_stock_flow(
                 normalized_items,
                 confirmation,
                 products_by_name,
+                shopping_list_id,
             )
     if runner is None:
         raise RuntimeError(f"Unsupported MCP transport '{mcp_transport}'.")
@@ -147,6 +170,7 @@ async def _receipt_stock_flow(
         normalized_items,
         confirmation,
         products_by_name,
+        shopping_list_id,
     )
 
 
@@ -156,6 +180,7 @@ async def _receipt_stock_flow_mcp(
     normalized_items: list[dict],
     confirmation,
     products_by_name: dict[str, int],
+    shopping_list_id: int | None,
 ) -> tuple[dict, list[dict], list[dict]]:
     match_preview = await runner.call(
         "workflow_match_products_preview_tool",
@@ -165,11 +190,14 @@ async def _receipt_stock_flow_mcp(
         match_preview, normalized_items, confirmation, products_by_name
     )
     await runner.call("workflow_stock_intake_apply_tool", items=json_dumps(apply_items))
-    reconcile_preview = await runner.call(
-        "workflow_shopping_reconcile_preview_tool",
-        items=json_dumps(apply_items),
-        list_id=int(manifest.source_metadata.get("shopping_list_id", 1)),
-    )
+    if shopping_list_id is None:
+        reconcile_preview = []
+    else:
+        reconcile_preview = await runner.call(
+            "workflow_shopping_reconcile_preview_tool",
+            items=json_dumps(apply_items),
+            list_id=shopping_list_id,
+        )
     apply_actions = flatten_shopping_actions(reconcile_preview)
     if apply_actions:
         await runner.call(
@@ -212,6 +240,7 @@ async def _recipe_url_shopping_flow(
     config: TestbedConfig,
     normalized_items: list[dict],
     confirmation,
+    shopping_list_id: int | None,
     mcp_transport: str,
 ) -> tuple[object, list[dict], list[dict]]:
     async with GrocyClient(config.proxy_url, config.proxy_api_key) as state_client:
@@ -224,7 +253,9 @@ async def _recipe_url_shopping_flow(
         apply_items, confirmation_actions = build_stock_apply_items(
             preview, normalized_items, confirmation, products_by_name
         )
-        list_id = int(manifest.source_metadata.get("shopping_list_id", 1))
+        if shopping_list_id is None:
+            raise RuntimeError("Recipe URL shopping scenarios require a configured shopping list.")
+        list_id = shopping_list_id
         for item in apply_items:
             args = [
                 "shopping",
@@ -243,11 +274,21 @@ async def _recipe_url_shopping_flow(
     if mcp_transport == "stdio":
         async with _StdioMcpRunner(config) as runner:
             return await _recipe_url_shopping_flow_mcp(
-                runner, manifest, normalized_items, confirmation, products_by_name
+                runner,
+                manifest,
+                normalized_items,
+                confirmation,
+                products_by_name,
+                shopping_list_id,
             )
     runner = _InProcessMcpRunner(config)
     return await _recipe_url_shopping_flow_mcp(
-        runner, manifest, normalized_items, confirmation, products_by_name
+        runner,
+        manifest,
+        normalized_items,
+        confirmation,
+        products_by_name,
+        shopping_list_id,
     )
 
 
@@ -257,6 +298,7 @@ async def _recipe_url_shopping_flow_mcp(
     normalized_items: list[dict],
     confirmation,
     products_by_name: dict[str, int],
+    shopping_list_id: int | None,
 ) -> tuple[object, list[dict], list[dict]]:
     preview = await runner.call(
         "workflow_match_products_preview_tool",
@@ -265,7 +307,9 @@ async def _recipe_url_shopping_flow_mcp(
     apply_items, confirmation_actions = build_stock_apply_items(
         preview, normalized_items, confirmation, products_by_name
     )
-    list_id = int(manifest.source_metadata.get("shopping_list_id", 1))
+    if shopping_list_id is None:
+        raise RuntimeError("Recipe URL shopping scenarios require a configured shopping list.")
+    list_id = shopping_list_id
     for item in apply_items:
         await runner.call(
             "shopping_list_add_tool",
@@ -305,6 +349,7 @@ async def run_scenario(
     ):
         async with GrocyClient(config.proxy_url, config.proxy_api_key) as client:
             state_before = await capture_state(client, shopping_names)
+            shopping_list_id = await _resolve_shopping_list_id(client, manifest, confirmation)
 
         if manifest.task_type == "receipt_stock":
             preview_output, confirmation_actions, apply_actions = await _receipt_stock_flow(
@@ -313,6 +358,7 @@ async def run_scenario(
                 config,
                 normalized_items,
                 confirmation,
+                shopping_list_id,
                 mcp_transport,
             )
         elif manifest.task_type == "pantry_audit":
@@ -326,6 +372,7 @@ async def run_scenario(
                 config,
                 normalized_items,
                 confirmation,
+                shopping_list_id,
                 mcp_transport,
             )
         else:  # pragma: no cover - manifest validation prevents this

@@ -5,13 +5,15 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+import httpx
 import pytest
 
 from testbed.evaluators.state import assert_expected_outcome
 from testbed.loaders import load_confirmation, load_expected_outcome, load_manifest
 from testbed.models import ExpectedOutcome, MutationExpectation, ScenarioConfirmation
-from testbed.runners.common import build_stock_apply_items
+from testbed.runners.common import build_stock_apply_items, flatten_shopping_actions
 from testbed.runners.run_suite import run_suite
+from testbed.seed.manage import _create_named_entities, wait_for_grocy
 from testbed.seed.session import _LoginFormParser
 from testbed.utils import TESTBED_DIR
 
@@ -104,6 +106,124 @@ def test_login_form_parser_finds_password_form():
 
     assert parser.forms[0]["action"] == "/login"
     assert any(item.get("type") == "password" for item in parser.forms[0]["inputs"])
+
+
+def test_wait_for_grocy_drives_root_route_until_database_ready(monkeypatch, tmp_path):
+    responses = iter(
+        [
+            httpx.Response(200, request=httpx.Request("GET", "http://grocy.test/")),
+            httpx.Response(200, request=httpx.Request("GET", "http://grocy.test/")),
+        ]
+    )
+    readiness = iter([False, True])
+    seen_urls: list[str] = []
+
+    def fake_get(url: str, **kwargs):
+        seen_urls.append(url)
+        return next(responses)
+
+    monkeypatch.setattr("testbed.seed.manage.httpx.get", fake_get)
+    monkeypatch.setattr("testbed.seed.manage._database_ready", lambda path: next(readiness))
+    monkeypatch.setattr("testbed.seed.manage.time.sleep", lambda _: None)
+
+    wait_for_grocy("http://grocy.test", tmp_path / "grocy.db", timeout=1)
+
+    assert seen_urls == [
+        "http://grocy.test",
+        "http://grocy.test",
+    ]
+
+
+def test_session_login_retries_transient_server_error(monkeypatch):
+    from testbed.seed.session import GrocySessionClient
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.post_calls = 0
+
+        def post(self, url: str, data: dict[str, str]):
+            self.post_calls += 1
+            status = 500 if self.post_calls == 1 else 200
+            return httpx.Response(status, request=httpx.Request("POST", url))
+
+        def get(self, url: str, headers: dict[str, str] | None = None):
+            return httpx.Response(200, request=httpx.Request("GET", url))
+
+        def close(self) -> None:
+            return
+
+    session = GrocySessionClient("http://grocy.test", "admin", "admin")
+    fake_client = FakeClient()
+    session.client = fake_client  # type: ignore[assignment]
+    monkeypatch.setattr(
+        session,
+        "_discover_login_form",
+        lambda: ("http://grocy.test/login", {"username": "admin", "password": "admin"}),
+    )
+    monkeypatch.setattr("testbed.seed.session.time.sleep", lambda _: None)
+
+    session.login(retries=1, retry_delay=0)
+
+    assert fake_client.post_calls == 2
+
+
+def test_create_named_entities_reuses_existing_names_case_insensitively():
+    class FakeSession:
+        def __init__(self) -> None:
+            self.create_calls: list[tuple[str, dict]] = []
+
+        def get_objects(self, entity: str):
+            assert entity == "quantity_units"
+            return [{"id": 2, "name": "Piece"}, {"id": 3, "name": "Pack"}]
+
+        def create_object(self, entity: str, data: dict):
+            self.create_calls.append((entity, data))
+            return 10 + len(self.create_calls)
+
+    session = FakeSession()
+
+    ids, warnings = _create_named_entities(
+        session,
+        "quantity_units",
+        "quantity_units",
+        [
+            {"name": "piece", "description": "Countable items"},
+            {"name": "carton", "description": "Cartons"},
+        ],
+    )
+
+    assert ids == {"piece": 2, "carton": 11}
+    assert warnings == []
+    assert session.create_calls == [
+        ("quantity_units", {"name": "carton", "description": "Cartons"})
+    ]
+
+
+def test_flatten_shopping_actions_strips_preview_only_fields():
+    actions = flatten_shopping_actions(
+        [
+            {
+                "actions": [
+                    {
+                        "shopping_item_id": 1,
+                        "action": "remove",
+                        "previous_amount": 2,
+                    },
+                    {
+                        "shopping_item_id": 2,
+                        "action": "set_amount",
+                        "previous_amount": 3,
+                        "new_amount": 1,
+                    },
+                ]
+            }
+        ]
+    )
+
+    assert actions == [
+        {"shopping_item_id": 1, "action": "remove"},
+        {"shopping_item_id": 2, "action": "set_amount", "new_amount": 1},
+    ]
 
 
 @pytest.mark.asyncio

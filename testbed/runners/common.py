@@ -140,7 +140,13 @@ def flatten_shopping_actions(preview_output: list[dict]) -> list[dict]:
     actions: list[dict] = []
     for item in preview_output:
         for action in item.get("actions", []):
-            actions.append(action)
+            payload = {
+                "shopping_item_id": action["shopping_item_id"],
+                "action": action["action"],
+            }
+            if "new_amount" in action:
+                payload["new_amount"] = action["new_amount"]
+            actions.append(payload)
     return actions
 
 
