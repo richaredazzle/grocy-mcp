@@ -40,7 +40,11 @@ from grocy_mcp.core.stock import (
     stock_search,
     stock_transfer,
 )
+from grocy_mcp.core.locations import location_create, locations_list
+from grocy_mcp.core.meal_plan import meal_plan_add, meal_plan_list, meal_plan_remove
+from grocy_mcp.core.stock_journal import stock_journal
 from grocy_mcp.core.system import entity_list, entity_manage, system_info
+from grocy_mcp.core.tasks import task_complete, task_create, task_delete, tasks_list
 
 
 @asynccontextmanager
@@ -385,6 +389,140 @@ def create_mcp_server() -> FastMCP:
         """
         async with _get_client() as client:
             return await chore_create(client, name)
+
+    # -------------------------------------------------------------- Locations
+
+    @mcp.tool()
+    async def locations_list_tool() -> str:
+        """List all storage locations in Grocy.
+
+        Shows location names, IDs, and whether each is a freezer.
+        """
+        async with _get_client() as client:
+            return await locations_list(client)
+
+    @mcp.tool()
+    async def location_create_tool(
+        name: str, is_freezer: bool = False, description: str = ""
+    ) -> str:
+        """Create a new storage location.
+
+        Args:
+            name: Location name (e.g. "Pantry", "Garage fridge").
+            is_freezer: Whether this location is a freezer (default false).
+            description: Optional description.
+        """
+        async with _get_client() as client:
+            return await location_create(client, name, is_freezer, description)
+
+    # ---------------------------------------------------------- Stock Journal
+
+    @mcp.tool()
+    async def stock_journal_tool(product: str | None = None) -> str:
+        """View recent stock transaction history.
+
+        Shows the 50 most recent stock changes (purchases, consumption,
+        transfers, inventory corrections). Optionally filter by product.
+
+        Args:
+            product: Optional product name or ID to filter by.
+        """
+        async with _get_client() as client:
+            return await stock_journal(client, product)
+
+    # ------------------------------------------------------------------ Tasks
+
+    @mcp.tool()
+    async def tasks_list_tool(show_done: bool = False) -> str:
+        """List tasks (to-do items separate from chores).
+
+        By default shows only incomplete tasks.
+
+        Args:
+            show_done: If true, also include completed tasks.
+        """
+        async with _get_client() as client:
+            return await tasks_list(client, show_done)
+
+    @mcp.tool()
+    async def task_create_tool(
+        name: str,
+        due_date: str | None = None,
+        assigned_to_user_id: int | None = None,
+        description: str = "",
+    ) -> str:
+        """Create a new task.
+
+        Args:
+            name: Task description (e.g. "Buy birthday present").
+            due_date: Optional due date in YYYY-MM-DD format.
+            assigned_to_user_id: Optional Grocy user ID to assign the task to.
+            description: Optional longer description or notes.
+        """
+        async with _get_client() as client:
+            return await task_create(client, name, due_date, assigned_to_user_id, description)
+
+    @mcp.tool()
+    async def task_complete_tool(task_id: int) -> str:
+        """Mark a task as done.
+
+        Args:
+            task_id: The task ID (from tasks_list_tool output).
+        """
+        async with _get_client() as client:
+            return await task_complete(client, task_id)
+
+    @mcp.tool()
+    async def task_delete_tool(task_id: int) -> str:
+        """Delete a task. This cannot be undone.
+
+        Args:
+            task_id: The task ID to delete.
+        """
+        async with _get_client() as client:
+            return await task_delete(client, task_id)
+
+    # --------------------------------------------------------------- Meal Plan
+
+    @mcp.tool()
+    async def meal_plan_list_tool() -> str:
+        """List all meal plan entries sorted by date.
+
+        Shows scheduled meals with their dates, recipe names, and notes.
+        """
+        async with _get_client() as client:
+            return await meal_plan_list(client)
+
+    @mcp.tool()
+    async def meal_plan_add_tool(
+        day: str,
+        recipe: str | None = None,
+        note: str = "",
+        meal_type: str = "",
+    ) -> str:
+        """Add an entry to the meal plan.
+
+        Either specify a recipe or a free-text note (or both).
+
+        Args:
+            day: Date in YYYY-MM-DD format (e.g. "2026-04-05").
+            recipe: Optional recipe name or ID to schedule.
+            note: Optional free-text note (e.g. "Eat out" or "Leftovers").
+            meal_type: Optional meal type (e.g. "recipe", "note"). Auto-detected
+                       if not provided.
+        """
+        async with _get_client() as client:
+            return await meal_plan_add(client, day, recipe, note, meal_type)
+
+    @mcp.tool()
+    async def meal_plan_remove_tool(entry_id: int) -> str:
+        """Remove an entry from the meal plan.
+
+        Args:
+            entry_id: The meal plan entry ID (from meal_plan_list_tool output).
+        """
+        async with _get_client() as client:
+            return await meal_plan_remove(client, entry_id)
 
     # ----------------------------------------------------------------- System
 

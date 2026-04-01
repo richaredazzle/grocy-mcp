@@ -38,7 +38,11 @@ from grocy_mcp.core.stock import (
     stock_search,
     stock_transfer,
 )
+from grocy_mcp.core.locations import location_create, locations_list
+from grocy_mcp.core.meal_plan import meal_plan_add, meal_plan_list, meal_plan_remove
+from grocy_mcp.core.stock_journal import stock_journal
 from grocy_mcp.core.system import entity_list, entity_manage, system_info
+from grocy_mcp.core.tasks import task_complete, task_create, task_delete, tasks_list
 from grocy_mcp.exceptions import GrocyError
 
 app = typer.Typer(help="Grocy CLI — manage stock, shopping lists, recipes and chores.")
@@ -46,6 +50,9 @@ stock_app = typer.Typer(help="Stock management commands.")
 shopping_app = typer.Typer(help="Shopping list commands.")
 recipes_app = typer.Typer(help="Recipe commands.")
 chores_app = typer.Typer(help="Chore commands.")
+locations_app = typer.Typer(help="Storage location commands.")
+tasks_app = typer.Typer(help="Task management commands.")
+meal_plan_app = typer.Typer(help="Meal plan commands.")
 system_app = typer.Typer(help="System information commands.")
 entity_app = typer.Typer(help="Generic entity management commands.")
 
@@ -53,6 +60,9 @@ app.add_typer(stock_app, name="stock")
 app.add_typer(shopping_app, name="shopping")
 app.add_typer(recipes_app, name="recipes")
 app.add_typer(chores_app, name="chores")
+app.add_typer(locations_app, name="locations")
+app.add_typer(tasks_app, name="tasks")
+app.add_typer(meal_plan_app, name="meal-plan")
 app.add_typer(system_app, name="system")
 app.add_typer(entity_app, name="entity")
 
@@ -448,6 +458,146 @@ def cmd_chore_create(name: str = typer.Argument(..., help="Chore name.")) -> Non
     async def _inner():
         async with _client() as client:
             return await chore_create(client, name)
+    _exec(_inner())
+
+
+# ----------------------------------------------------------------- Locations
+
+@locations_app.command("list")
+def cmd_locations_list() -> None:
+    """List all storage locations."""
+    if _output_json:
+        async def _inner():
+            async with _client() as client:
+                return await client.get_objects("locations")
+        _exec_json(_inner())
+    else:
+        async def _inner():
+            async with _client() as client:
+                return await locations_list(client)
+        _exec(_inner())
+
+
+@locations_app.command("create")
+def cmd_location_create(
+    name: str = typer.Argument(..., help="Location name."),
+    freezer: bool = typer.Option(False, "--freezer", help="Mark as a freezer location."),
+    description: str = typer.Option("", "--description", "-d", help="Optional description."),
+) -> None:
+    """Create a new storage location."""
+    async def _inner():
+        async with _client() as client:
+            return await location_create(client, name, freezer, description)
+    _exec(_inner())
+
+
+# ------------------------------------------------------------- Stock Journal
+
+@stock_app.command("journal", rich_help_panel="View")
+def cmd_stock_journal(
+    product: str | None = typer.Argument(None, help="Optional product name or ID to filter by."),
+) -> None:
+    """View recent stock transaction history."""
+    async def _inner():
+        async with _client() as client:
+            return await stock_journal(client, product)
+    _exec(_inner())
+
+
+# -------------------------------------------------------------------- Tasks
+
+@tasks_app.command("list")
+def cmd_tasks_list(
+    show_done: bool = typer.Option(False, "--done", help="Include completed tasks."),
+) -> None:
+    """List tasks."""
+    if _output_json:
+        async def _inner():
+            async with _client() as client:
+                return await client.get_objects("tasks")
+        _exec_json(_inner())
+    else:
+        async def _inner():
+            async with _client() as client:
+                return await tasks_list(client, show_done)
+        _exec(_inner())
+
+
+@tasks_app.command("create")
+def cmd_task_create(
+    name: str = typer.Argument(..., help="Task name."),
+    due_date: str | None = typer.Option(None, "--due", help="Due date (YYYY-MM-DD)."),
+    assigned_to: int | None = typer.Option(None, "--assign", help="User ID to assign to."),
+    description: str = typer.Option("", "--description", "-d", help="Task description."),
+) -> None:
+    """Create a new task."""
+    async def _inner():
+        async with _client() as client:
+            return await task_create(client, name, due_date, assigned_to, description)
+    _exec(_inner())
+
+
+@tasks_app.command("complete")
+def cmd_task_complete(
+    task_id: int = typer.Argument(..., help="Task ID to complete."),
+) -> None:
+    """Mark a task as done."""
+    async def _inner():
+        async with _client() as client:
+            return await task_complete(client, task_id)
+    _exec(_inner())
+
+
+@tasks_app.command("delete")
+def cmd_task_delete(
+    task_id: int = typer.Argument(..., help="Task ID to delete."),
+) -> None:
+    """Delete a task."""
+    async def _inner():
+        async with _client() as client:
+            return await task_delete(client, task_id)
+    _exec(_inner())
+
+
+# --------------------------------------------------------------- Meal Plan
+
+@meal_plan_app.command("list")
+def cmd_meal_plan_list() -> None:
+    """List all meal plan entries."""
+    if _output_json:
+        async def _inner():
+            async with _client() as client:
+                return await client.get_objects("meal_plan")
+        _exec_json(_inner())
+    else:
+        async def _inner():
+            async with _client() as client:
+                return await meal_plan_list(client)
+        _exec(_inner())
+
+
+@meal_plan_app.command("add")
+def cmd_meal_plan_add(
+    day: str = typer.Argument(..., help="Date (YYYY-MM-DD)."),
+    recipe: str | None = typer.Option(None, "--recipe", "-r", help="Recipe name or ID."),
+    note: str = typer.Option("", "--note", "-n", help="Free-text note."),
+    meal_type: str = typer.Option("", "--type", help="Meal type (e.g. recipe, note)."),
+) -> None:
+    """Add an entry to the meal plan."""
+    async def _inner():
+        async with _client() as client:
+            return await meal_plan_add(client, day, recipe, note, meal_type)
+    _exec(_inner())
+
+
+@meal_plan_app.command("remove")
+def cmd_meal_plan_remove(
+    entry_id: int = typer.Argument(..., help="Meal plan entry ID."),
+) -> None:
+    """Remove a meal plan entry."""
+    async def _inner():
+        async with _client() as client:
+            return await meal_plan_remove(client, entry_id)
     _exec(_inner())
 
 
