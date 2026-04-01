@@ -63,6 +63,18 @@ from grocy_mcp.core.resolve import resolve_product, resolve_recipe
 from grocy_mcp.core.stock_journal import stock_journal
 from grocy_mcp.core.system import entity_list, entity_manage, system_info
 from grocy_mcp.core.tasks import task_complete, task_create, task_delete, tasks_list
+from grocy_mcp.core.workflows import (
+    workflow_match_products_preview,
+    workflow_match_products_preview_data,
+    workflow_shopping_reconcile_apply,
+    workflow_shopping_reconcile_apply_data,
+    workflow_shopping_reconcile_preview,
+    workflow_shopping_reconcile_preview_data,
+    workflow_stock_intake_apply,
+    workflow_stock_intake_apply_data,
+    workflow_stock_intake_preview,
+    workflow_stock_intake_preview_data,
+)
 from grocy_mcp.exceptions import GrocyError
 
 app = typer.Typer(help="Grocy CLI — manage stock, shopping lists, recipes and chores.")
@@ -75,6 +87,7 @@ tasks_app = typer.Typer(help="Task management commands.")
 meal_plan_app = typer.Typer(help="Meal plan commands.")
 system_app = typer.Typer(help="System information commands.")
 entity_app = typer.Typer(help="Generic entity management commands.")
+workflow_app = typer.Typer(help="Workflow-oriented preview/apply commands.")
 
 app.add_typer(stock_app, name="stock")
 app.add_typer(shopping_app, name="shopping")
@@ -85,6 +98,7 @@ app.add_typer(tasks_app, name="tasks")
 app.add_typer(meal_plan_app, name="meal-plan")
 app.add_typer(system_app, name="system")
 app.add_typer(entity_app, name="entity")
+app.add_typer(workflow_app, name="workflow")
 
 # Global state set by the app callback.
 _cli_url: str | None = None
@@ -921,6 +935,136 @@ def cmd_meal_plan_shopping(
             return await meal_plan_shopping(client, start_date, end_date)
 
     _exec(_inner())
+
+
+# ------------------------------------------------------------------ Workflow
+
+
+@workflow_app.command("match-products-preview")
+def cmd_workflow_match_products_preview(
+    items: str = typer.Argument(
+        ...,
+        help="JSON array of normalized input items, e.g. "
+        '\'[{"label": "whole milk", "quantity": 2, "barcode": "123"}]\'',
+    ),
+) -> None:
+    """Preview product matches for chat- or vision-produced shopping items."""
+    parsed_items = _parse_json(items, "items")
+    if _output_json:
+
+        async def _inner():
+            async with _client() as client:
+                return await workflow_match_products_preview_data(client, parsed_items)
+
+        _exec_json(_inner())
+    else:
+
+        async def _inner():
+            async with _client() as client:
+                return await workflow_match_products_preview(client, parsed_items)
+
+        _exec(_inner())
+
+
+@workflow_app.command("stock-intake-preview")
+def cmd_workflow_stock_intake_preview(
+    items: str = typer.Argument(
+        ...,
+        help="JSON array of normalized input items before confirming Grocy product IDs.",
+    ),
+) -> None:
+    """Preview how external items would map into Grocy stock additions."""
+    parsed_items = _parse_json(items, "items")
+    if _output_json:
+
+        async def _inner():
+            async with _client() as client:
+                return await workflow_stock_intake_preview_data(client, parsed_items)
+
+        _exec_json(_inner())
+    else:
+
+        async def _inner():
+            async with _client() as client:
+                return await workflow_stock_intake_preview(client, parsed_items)
+
+        _exec(_inner())
+
+
+@workflow_app.command("stock-intake-apply")
+def cmd_workflow_stock_intake_apply(
+    items: str = typer.Argument(
+        ...,
+        help='JSON array of confirmed items, e.g. \'[{"product_id": 12, "amount": 2}]\'',
+    ),
+) -> None:
+    """Apply confirmed stock additions using explicit Grocy product IDs."""
+    parsed_items = _parse_json(items, "items")
+    if _output_json:
+
+        async def _inner():
+            async with _client() as client:
+                return await workflow_stock_intake_apply_data(client, parsed_items)
+
+        _exec_json(_inner())
+    else:
+
+        async def _inner():
+            async with _client() as client:
+                return await workflow_stock_intake_apply(client, parsed_items)
+
+        _exec(_inner())
+
+
+@workflow_app.command("shopping-reconcile-preview")
+def cmd_workflow_shopping_reconcile_preview(
+    items: str = typer.Argument(
+        ...,
+        help='JSON array of confirmed purchased items, e.g. \'[{"product_id": 12, "amount": 2}]\'',
+    ),
+    list_id: int = typer.Option(1, "--list-id", "-l", help="Shopping list ID."),
+) -> None:
+    """Preview shopping-list removals and amount reductions after a purchase."""
+    parsed_items = _parse_json(items, "items")
+    if _output_json:
+
+        async def _inner():
+            async with _client() as client:
+                return await workflow_shopping_reconcile_preview_data(client, parsed_items, list_id)
+
+        _exec_json(_inner())
+    else:
+
+        async def _inner():
+            async with _client() as client:
+                return await workflow_shopping_reconcile_preview(client, parsed_items, list_id)
+
+        _exec(_inner())
+
+
+@workflow_app.command("shopping-reconcile-apply")
+def cmd_workflow_shopping_reconcile_apply(
+    actions: str = typer.Argument(
+        ...,
+        help="JSON array of explicit shopping-list actions from the preview output.",
+    ),
+) -> None:
+    """Apply explicit shopping-list reconciliation actions."""
+    parsed_actions = _parse_json(actions, "actions")
+    if _output_json:
+
+        async def _inner():
+            async with _client() as client:
+                return await workflow_shopping_reconcile_apply_data(client, parsed_actions)
+
+        _exec_json(_inner())
+    else:
+
+        async def _inner():
+            async with _client() as client:
+                return await workflow_shopping_reconcile_apply(client, parsed_actions)
+
+        _exec(_inner())
 
 
 # -------------------------------------------------------------------- System

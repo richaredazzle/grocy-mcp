@@ -1,148 +1,261 @@
 # Roadmap
 
-This roadmap focuses on what is still worth doing now that the project already has:
+This roadmap is a checkpoint ledger, not a feature wishlist.
 
-- broad stock, shopping, recipe, chore, location, task, meal-plan, and entity coverage
-- both MCP and CLI interfaces
-- CI, changelog, contributing docs, and better GitHub polish
+`grocy-mcp` follows a two-layer model:
 
-The remaining work is less about "add more commands" and more about turning `grocy-mcp` into the version people can trust as their default Grocy interface.
+- `grocy-mcp` stays the Grocy-facing core: MCP server, CLI, stable workflow contracts
+- chat, OCR, and image interpretation stay outside this repo and feed normalized JSON into it
 
-## Coverage reality check
+The goal is to ship small, mergeable increments that are easy to test, review, and reason about.
 
-Based on Grocy's public site and official OpenAPI surface, `grocy-mcp` already covers a meaningful core of Grocy:
+## Operating Model
 
-- stock operations
-- shopping list workflows
+Every checkpoint is a separate PR and only counts as done when:
+
+- code is implemented
+- unit tests and relevant CLI/MCP tests pass
+- docs are updated in the same PR
+- review feedback is addressed
+- the increment is merged
+
+### Standard acceptance gate
+
+Every checkpoint must satisfy this gate before merge:
+
+- unit tests for all new core and workflow logic
+- CLI tests for text and JSON modes where applicable
+- MCP tests for tool registration, structured output, and malformed JSON/input validation
+- opt-in live Grocy integration coverage for mutating checkpoints
+- README, roadmap status, command/tool help text, and coverage notes updated in the same PR
+- no known doc/code drift left behind
+
+## Coverage Matrix Placeholder
+
+Use this section to keep the project honest as it grows.
+
+### First-class support
+
+- stock
+- shopping list
 - recipes
 - chores
-- tasks
 - locations
+- tasks
 - meal plan
-- generic entity CRUD for exposed entities
+- workflow preview/apply primitives
 
-However, Grocy's API and UI also expose additional surfaces that are not yet first-class in this project and should shape the next roadmap:
+### Generic-entity-only support
 
-- batteries
-- equipment
-- calendar-oriented views
-- files and attachments
-- print/export workflows
-- shopping list metadata such as shopping lists and shopping locations
-- quantity units and quantity-unit conversions
+- shopping lists
+- shopping locations
+- quantity units
+- quantity-unit conversions
+- product groups
 - task categories
 - meal-plan sections
 - recipe nestings
-- product groups and price-history/last-purchased views
-- stock-current-location and richer stock journal/reporting data
-- user/current-user and assignment-aware flows
-- advanced generic entities such as userfields, userentities, and userobjects
+- batteries
+- equipment
+- files and print-related surfaces
+- userfields, userentities, userobjects
 
-## North Star
+### Not yet covered as first-class workflows
 
-An excellent `grocy-mcp` should feel like:
+- receipt- and vision-oriented stock intake flows beyond normalized JSON handoff
+- shopping reconciliation helpers beyond the current workflow layer
+- battery-specific views and lifecycle actions
+- equipment-specific views and lifecycle actions
+- calendar-oriented combined reporting
+- file-group helpers for pictures/manuals
+- print/export helpers
+- discover-fields and describe-entity helpers
 
-- the best Grocy MCP server for AI agents
-- a CLI that is pleasant for daily human use and robust for scripting
-- a project where docs, behavior, tests, and release quality stay aligned
-- a tool that covers the Grocy workflows people actually do every week
+## Track A: Workflow-Enabling Core
 
-## Priority 1: Reliability and consistency
+### [x] CP01 - Roadmap rewrite
 
-- [ ] Audit every CLI command and MCP tool so equivalent operations behave consistently across both surfaces.
-- [ ] Standardize output shapes for JSON mode where similar commands currently return differently structured payloads.
-- [ ] Add regression tests for every command/tool that accepts JSON input or optional flags with non-obvious behavior.
-- [ ] Add stronger integration coverage against a real Grocy instance for the highest-risk flows:
-  stock add/consume/transfer, shopping updates, recipe creation/editing, chores execution, tasks, and meal-plan shopping.
-- [ ] Add explicit compatibility notes for supported Grocy versions and document any known API quirks by version.
+- Goal: replace the priority list with checkpoint IDs and a merge-driven execution model
+- Deliverables:
+  - checkpoint ledger in `ROADMAP.md`
+  - standard acceptance gate
+  - coverage matrix placeholder
+- Acceptance gate: docs-only review plus roadmap consistency
+- PR: fill after merge
 
-## Priority 2: Best-in-class MCP ergonomics
+### [x] CP02 - Stable workflow JSON policy
 
-- [ ] Review all tool names and descriptions from an AI-agent perspective and simplify any confusing or overly technical wording.
-- [ ] Decide where MCP should return richer structured data instead of formatted strings, especially for search, detail, fulfillment, and journal-style tools.
-- [ ] Add safer low-level entity tooling guidance so agents know when to prefer domain-specific tools over generic CRUD.
-- [ ] Add examples of agent workflows that chain tools together for common household tasks:
-  weekly restock, cook-from-stock, meal-plan-to-shopping, overdue-chore sweep, and pantry audit.
-- [ ] Consider separating "read" tools from "mutating" tools more clearly in naming and docs to reduce accidental writes.
+- Goal: define the public JSON contracts for preview/apply flows
+- Deliverables:
+  - one design doc for workflow semantics and contract stability
+  - README note describing the two-layer split
+  - explicit statement that raw images stay outside this repo
+- Acceptance gate: docs align with implemented workflow shapes
+- PR: fill after merge
 
-## Priority 3: Excellent CLI experience
+### [x] CP03 - Batch product matching preview
 
-- [ ] Make JSON mode fully intentional and documented: define which commands support it, what shape they return, and where stability is guaranteed.
-- [ ] Add shell-friendly examples for `jq`, PowerShell, and simple automation scripts.
-- [ ] Improve help text for commands with JSON arguments by showing one realistic example per command.
-- [ ] Add validation for user-facing inputs such as dates, entity actions, and enum-like arguments before the request reaches Grocy.
-- [ ] Review whether a few carefully chosen aliases would improve ergonomics without creating ambiguity.
+- Goal: add a workflow-oriented product-match preview for chat/image clients
+- Deliverables:
+  - `workflow_match_products_preview` MCP tool
+  - `grocy workflow match-products-preview`
+  - stable preview result shape with `matched`, `ambiguous`, `unmatched`
+  - matching policy:
+    barcode exact match, then exact normalized name, then substring match
+- Acceptance gate:
+  - exact barcode match test
+  - exact name match test
+  - ambiguous match test
+  - unmatched item test
+  - malformed JSON/input validation test
+- PR: fill after merge
 
-## Priority 4: Fill the highest-value Grocy domain gaps
+### [x] CP04 - Bulk stock intake preview/apply
 
-The project is already broad. The next domain work should be selected based on real day-to-day usefulness:
+- Goal: support the "I bought these groceries" workflow from normalized external items
+- Deliverables:
+  - `workflow_stock_intake_preview` MCP tool
+  - `workflow_stock_intake_apply` MCP tool
+  - CLI parity under `grocy workflow`
+  - explicit-IDs-only apply contract
+- Acceptance gate:
+  - preview contract tests
+  - apply uses only explicit `product_id`
+  - no implicit name re-resolution during apply
+- PR: fill after merge
 
-- [ ] Batteries as a first-class domain:
-  list, details, charge/replacement tracking, cycle history, and overdue battery views.
-- [ ] Equipment as a first-class domain:
-  list, create/update flows, linked batteries, manuals/files, and maintenance-oriented workflows.
-- [ ] Shopping metadata support:
-  shopping lists, shopping locations, and better multi-list workflows.
-- [ ] Product groups, quantity units, and quantity-unit conversions as dedicated tools/commands.
-- [ ] Better purchase and price-history workflows using Grocy's last-purchased and average-price data.
-- [ ] More complete recipe editing and recipe-position metadata support, including recipe nestings where useful.
-- [ ] Richer meal-plan operations:
-  bulk planning, date-range inspection, replace/move entries, section support, and plan previews.
-- [ ] Task categories and assignment-aware task/chore workflows where Grocy supports them.
-- [ ] Calendar-oriented views that combine chores, batteries, meal-plan items, and tasks into one planning surface.
+### [x] CP05 - Shopping reconciliation preview/apply
 
-## Priority 5: Files, print, and companion surfaces
+- Goal: compare confirmed purchases against a shopping list and propose explicit actions
+- Deliverables:
+  - `workflow_shopping_reconcile_preview` MCP tool
+  - `workflow_shopping_reconcile_apply` MCP tool
+  - CLI parity under `grocy workflow`
+  - explicit shopping item IDs in apply actions
+- Acceptance gate:
+  - full purchase test
+  - partial purchase test
+  - unmatched purchased item test
+  - apply action test for remove and amount update
+- PR: fill after merge
 
-- [ ] Support Grocy file groups where they add real value:
-  recipe pictures, product pictures, equipment manuals, and user files.
-- [ ] Evaluate whether print/export endpoints are useful enough to expose through MCP and CLI.
-- [ ] Add document- and attachment-aware workflows where they reduce context switching from Grocy's UI.
+### [x] CP06 - LLM workflow docs and examples
 
-## Priority 6: Search, resolution, and discoverability
+- Goal: document how ChatGPT/Claude should use the workflow layer
+- Deliverables:
+  - receipt text -> preview -> confirm -> apply example
+  - grocery photo interpreted by an LLM -> preview -> confirm -> apply example
+  - pantry photo -> read-only preview example
+  - sample prompts that produce normalized item JSON before tool calls
+- Acceptance gate: README and design doc examples match real command/tool names
+- PR: fill after merge
 
-- [ ] Make name resolution smarter while staying predictable:
-  better ambiguity messages, optional stricter matching modes, and clearer suggestions.
-- [ ] Add richer search outputs for products, recipes, chores, locations, and tasks.
-- [ ] Improve barcode flows so users can move naturally between barcode lookup, product info, and stock actions.
-- [ ] Add a "describe this entity type" or "discover fields" capability for safer generic entity usage.
-- [ ] Add API-backed discovery helpers for supported Grocy entities, tags, and field shapes so agents can reason safely about generic CRUD.
+## Track B: Remaining Grocy Feature Coverage
 
-## Priority 7: Documentation that stays true
+### [ ] CP07 - Shopping metadata coverage
 
-- [ ] Keep one clearly current design/implementation doc pair and explicitly mark older specs as historical.
-- [ ] Add a short "Which interface should I use?" section comparing MCP, CLI, and generic entity tools.
-- [ ] Add a "common workflows" guide that shows the same task done through CLI and MCP.
-- [ ] Add troubleshooting for Grocy-specific issues:
-  reverse proxies, API permissions, object-field mismatches, and version differences.
-- [ ] Add contributor guidance for keeping docs aligned whenever commands or tool behavior change.
-- [ ] Add a coverage matrix showing:
-  current first-class support, generic-entity-only support, and not-yet-covered Grocy surfaces.
+- Goal: move `shopping_lists` and `shopping_locations` from generic-only to first-class
+- Deliverables:
+  - first-class MCP/CLI list/create/update flows where the API supports them
+  - docs and coverage matrix updates
+- Acceptance gate: tests for list and mutation paths where applicable
+- PR: fill after merge
 
-## Priority 8: Release and maintenance maturity
+### [ ] CP08 - Quantity units, conversions, product groups, price history
 
-- [ ] Define a stable pre-1.0 compatibility promise for command names, tool names, and JSON output expectations.
-- [ ] Add release checklists covering docs, changelog, tests, packaging, and MCP/CLI parity review.
-- [ ] Publish example configs for Claude Desktop, Claude Code, and generic MCP HTTP clients.
-- [ ] Add a lightweight support policy for bug reports:
-  what environment details to include, which Grocy versions are expected, and how to provide reproducible payloads.
+- Goal: expose the next highest-value stock metadata surfaces
+- Deliverables:
+  - first-class support for `quantity_units`, `quantity_unit_conversions`, `product_groups`
+  - read-heavy support for `products_last_purchased` and `products_average_price`
+  - JSON-mode reporting for these read surfaces
+- Acceptance gate: structured output tests plus docs
+- PR: fill after merge
 
-## What "complete enough for 1.0" looks like
+### [ ] CP09 - Batteries
 
-The project is ready for a confident `1.0` when all of the following feel true:
+- Goal: make batteries a first-class household workflow
+- Deliverables:
+  - list/details
+  - due/overdue charge views
+  - charge/replacement/cycle-history support where the Grocy API shape allows it
+- Acceptance gate: unit and integration tests for supported mutation paths
+- PR: fill after merge
+
+### [ ] CP10 - Equipment
+
+- Goal: make equipment a first-class domain with battery visibility
+- Deliverables:
+  - list/details/create/update
+  - linked battery visibility
+  - references to file/manual surfaces where available
+- Acceptance gate: first-class CLI/MCP parity plus docs
+- PR: fill after merge
+
+### [ ] CP11 - Task categories and assignment-aware flows
+
+- Goal: improve task and chore context for household planning
+- Deliverables:
+  - first-class support for `task_categories`
+  - richer task/chore JSON outputs with assignee context where the API returns it
+- Acceptance gate: structured output tests and docs updates
+- PR: fill after merge
+
+### [ ] CP12 - Meal-plan sections and richer planning
+
+- Goal: deepen planning support before broader bulk-write tools
+- Deliverables:
+  - support for `meal_plan_sections`
+  - range summary and section-aware planning/reporting tools
+- Acceptance gate: read-model tests plus docs
+- PR: fill after merge
+
+### [ ] CP13 - Calendar-oriented read models
+
+- Goal: add one planning surface that summarizes chores, batteries, tasks, and meal plans
+- Deliverables:
+  - read-only combined planning/report tools
+  - no calendar mutation model in v1
+- Acceptance gate: JSON-contract tests and docs
+- PR: fill after merge
+
+### [ ] CP14 - Files and print/export
+
+- Goal: expose only the file/print surfaces that are genuinely useful and automatable
+- Deliverables:
+  - scoped support for product pictures, recipe pictures, equipment manuals, and user files
+  - print/export exposure only if it is cleanly testable
+- Acceptance gate: docs, narrow surface area, and explicit limitations
+- PR: fill after merge
+
+### [ ] CP15 - Search/discovery helpers
+
+- Goal: make generic CRUD and ambiguous lookups safer for both humans and agents
+- Deliverables:
+  - richer candidate search across product/recipe/chore/location/task surfaces
+  - discover-fields or describe-entity helper for generic CRUD
+  - better ambiguity messaging in CLI and MCP
+- Acceptance gate: ambiguity and structured-output tests
+- PR: fill after merge
+
+## Track C: 1.0 Readiness
+
+### [ ] CP16 - 1.0 readiness
+
+- Goal: define what is stable before calling the project complete enough for 1.0
+- Deliverables:
+  - compatibility promise for tool names, command names, and workflow JSON contracts
+  - release checklist and support policy
+  - completed coverage matrix
+  - one authoritative current design/implementation doc pair
+- Acceptance gate: docs and release policy review
+- PR: fill after merge
+
+## What "Complete Enough for 1.0" Looks Like
+
+The project is ready for a confident `1.0` when:
 
 - command and tool behavior is predictable and well-tested
-- JSON mode is documented and stable enough for scripting
-- the most common Grocy household workflows are covered without needing generic CRUD as a fallback
-- MCP docs help agents choose the right tool on the first try
-- contributor docs make it hard for implementation and docs to drift apart
-
-## Suggested execution order
-
-If we want the highest payoff path from here, the best order is:
-
-1. reliability and consistency
-2. MCP ergonomics plus JSON/output stability
-3. CLI usability and validation
-4. highest-value Grocy domain gaps from the official API surface
-5. search/discovery and coverage matrix work
-6. documentation discipline and 1.0 release readiness
+- workflow JSON contracts are documented and stable enough for scripting and LLM orchestration
+- common Grocy household flows do not require generic CRUD as the default path
+- docs clearly separate first-class support from generic-only support
+- contributors can extend the project without creating doc/code drift

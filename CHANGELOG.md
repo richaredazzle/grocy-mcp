@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Workflow contracts**: stable preview/apply JSON schemas for chat- and vision-driven Grocy workflows
+- **Workflow tools**: product-match preview, stock-intake preview/apply, and shopping-reconcile preview/apply in both MCP and CLI surfaces
+- **Workflow design docs**: new current design doc describing the two-layer architecture and no-raw-image boundary
 - **Locations**: list and create storage locations (with freezer flag)
 - **Stock journal**: view recent stock transaction history, optionally filtered by product
 - **Tasks**: list, create, complete, and delete tasks (separate from chores)
@@ -31,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Roadmap rewritten as a checkpoint ledger with Track A/B/C execution slices and merge gates
+- README updated to document workflow contracts, external LLM/image handoff, and workflow examples
 - MCP tool descriptions rewritten for AI agent readability with examples and cross-references
 - Output formatting standardized: consistent empty states, quoted names, bracket IDs, em-dash separators
 - Removed unused `client.search_products()` and `client.update_recipe()` methods

@@ -64,6 +64,13 @@ from grocy_mcp.core.meal_plan import (
 from grocy_mcp.core.stock_journal import stock_journal
 from grocy_mcp.core.system import entity_list, entity_manage, system_info
 from grocy_mcp.core.tasks import task_complete, task_create, task_delete, tasks_list
+from grocy_mcp.core.workflows import (
+    workflow_match_products_preview_data,
+    workflow_shopping_reconcile_apply_data,
+    workflow_shopping_reconcile_preview_data,
+    workflow_stock_intake_apply_data,
+    workflow_stock_intake_preview_data,
+)
 
 
 @asynccontextmanager
@@ -668,6 +675,77 @@ def create_mcp_server() -> FastMCP:
         """
         async with _get_client() as client:
             return await meal_plan_shopping(client, start_date, end_date)
+
+    # --------------------------------------------------------------- Workflow
+
+    @mcp.tool()
+    async def workflow_match_products_preview_tool(items: str) -> list[dict]:
+        """Preview product matches for normalized external items.
+
+        Use this when an LLM or another client has already converted a receipt,
+        chat message, or image into a normalized item list and you need Grocy
+        product IDs before applying stock changes.
+
+        Args:
+            items: JSON array of normalized input items.
+        """
+        parsed_items = _parse_json_arg(items, "items")
+        async with _get_client() as client:
+            return await workflow_match_products_preview_data(client, parsed_items)
+
+    @mcp.tool()
+    async def workflow_stock_intake_preview_tool(items: str) -> list[dict]:
+        """Preview Grocy stock additions for normalized external items.
+
+        This uses the same matching contract as workflow_match_products_preview_tool,
+        but is named for the common \"I bought these groceries\" workflow.
+
+        Args:
+            items: JSON array of normalized input items.
+        """
+        parsed_items = _parse_json_arg(items, "items")
+        async with _get_client() as client:
+            return await workflow_stock_intake_preview_data(client, parsed_items)
+
+    @mcp.tool()
+    async def workflow_stock_intake_apply_tool(items: str) -> dict:
+        """Apply confirmed stock additions using explicit Grocy product IDs.
+
+        Apply only confirmed IDs from a prior preview step. This tool does not
+        resolve names implicitly.
+
+        Args:
+            items: JSON array of confirmed apply items, each with product_id and amount.
+        """
+        parsed_items = _parse_json_arg(items, "items")
+        async with _get_client() as client:
+            return await workflow_stock_intake_apply_data(client, parsed_items)
+
+    @mcp.tool()
+    async def workflow_shopping_reconcile_preview_tool(items: str, list_id: int = 1) -> list[dict]:
+        """Preview shopping-list removals and amount updates after a purchase.
+
+        Provide confirmed Grocy product IDs for what was purchased and this tool
+        will propose explicit shopping-item actions without applying them.
+
+        Args:
+            items: JSON array of confirmed apply items, each with product_id and amount.
+            list_id: Shopping list ID to reconcile against.
+        """
+        parsed_items = _parse_json_arg(items, "items")
+        async with _get_client() as client:
+            return await workflow_shopping_reconcile_preview_data(client, parsed_items, list_id)
+
+    @mcp.tool()
+    async def workflow_shopping_reconcile_apply_tool(actions: str) -> dict:
+        """Apply explicit shopping-list reconciliation actions from a preview step.
+
+        Args:
+            actions: JSON array of action objects from workflow_shopping_reconcile_preview_tool.
+        """
+        parsed_actions = _parse_json_arg(actions, "actions")
+        async with _get_client() as client:
+            return await workflow_shopping_reconcile_apply_data(client, parsed_actions)
 
     # ----------------------------------------------------------------- System
 

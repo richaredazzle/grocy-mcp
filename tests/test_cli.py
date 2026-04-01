@@ -476,3 +476,128 @@ def test_cli_recipe_preview_command():
     assert result.exit_code == 0
     assert "Preview" in result.output
     assert "Flour" in result.output
+
+
+def test_workflow_match_products_preview_json_output():
+    """Workflow preview should return structured JSON in --json mode."""
+    with patch(
+        "grocy_mcp.cli.app.workflow_match_products_preview_data", new_callable=AsyncMock
+    ) as mock_fn:
+        mock_fn.return_value = [
+            {
+                "input_index": 0,
+                "label": "whole milk",
+                "status": "matched",
+                "matched_product_id": 12,
+                "matched_product_name": "Whole Milk",
+                "candidates": [{"product_id": 12, "name": "Whole Milk"}],
+                "suggested_amount": 2,
+                "unit_text": "cartons",
+            }
+        ]
+        with patch("grocy_mcp.cli.app._client") as mock_cf:
+            mock_client = MagicMock()
+            mock_cf.return_value.__aenter__.return_value = mock_client
+            result = runner.invoke(
+                app,
+                [
+                    "--json",
+                    "workflow",
+                    "match-products-preview",
+                    '[{"label":"whole milk","quantity":2}]',
+                ],
+            )
+
+    assert result.exit_code == 0
+    import json
+
+    data = json.loads(result.output)
+    assert data[0]["status"] == "matched"
+    mock_fn.assert_awaited_once_with(mock_client, [{"label": "whole milk", "quantity": 2}])
+
+
+def test_workflow_match_products_preview_text_output():
+    """Workflow preview should render human-readable text by default."""
+    with patch(
+        "grocy_mcp.cli.app.workflow_match_products_preview", new_callable=AsyncMock
+    ) as mock_fn:
+        mock_fn.return_value = "Workflow product match preview:\n  [0] whole milk: matched"
+        with patch("grocy_mcp.cli.app._client") as mock_cf:
+            mock_cf.return_value.__aenter__.return_value = MagicMock()
+            result = runner.invoke(
+                app,
+                ["workflow", "match-products-preview", '[{"label":"whole milk","quantity":2}]'],
+            )
+
+    assert result.exit_code == 0
+    assert "Workflow product match preview" in result.output
+
+
+def test_workflow_match_products_preview_invalid_json():
+    """Workflow preview should reject malformed JSON input."""
+    result = runner.invoke(app, ["workflow", "match-products-preview", "not-json"])
+    assert result.exit_code == 2
+    assert "invalid JSON" in result.output
+
+
+def test_workflow_stock_intake_apply_json_output():
+    """Workflow stock intake apply should return structured JSON in --json mode."""
+    with patch(
+        "grocy_mcp.cli.app.workflow_stock_intake_apply_data", new_callable=AsyncMock
+    ) as mock_fn:
+        mock_fn.return_value = {
+            "applied_count": 1,
+            "applied_items": [{"product_id": 12, "amount": 2, "note": "organic"}],
+        }
+        with patch("grocy_mcp.cli.app._client") as mock_cf:
+            mock_client = MagicMock()
+            mock_cf.return_value.__aenter__.return_value = mock_client
+            result = runner.invoke(
+                app,
+                ["--json", "workflow", "stock-intake-apply", '[{"product_id":12,"amount":2}]'],
+            )
+
+    assert result.exit_code == 0
+    import json
+
+    data = json.loads(result.output)
+    assert data["applied_count"] == 1
+    mock_fn.assert_awaited_once_with(mock_client, [{"product_id": 12, "amount": 2}])
+
+
+def test_workflow_shopping_reconcile_preview_json_output():
+    """Workflow shopping reconcile preview should return structured JSON."""
+    with patch(
+        "grocy_mcp.cli.app.workflow_shopping_reconcile_preview_data", new_callable=AsyncMock
+    ) as mock_fn:
+        mock_fn.return_value = [
+            {
+                "input_index": 0,
+                "product_id": 12,
+                "purchased_amount": 2,
+                "status": "matched",
+                "actions": [{"shopping_item_id": 5, "action": "remove", "previous_amount": 2}],
+                "unapplied_amount": 0,
+            }
+        ]
+        with patch("grocy_mcp.cli.app._client") as mock_cf:
+            mock_client = MagicMock()
+            mock_cf.return_value.__aenter__.return_value = mock_client
+            result = runner.invoke(
+                app,
+                [
+                    "--json",
+                    "workflow",
+                    "shopping-reconcile-preview",
+                    '[{"product_id":12,"amount":2}]',
+                    "--list-id",
+                    "2",
+                ],
+            )
+
+    assert result.exit_code == 0
+    import json
+
+    data = json.loads(result.output)
+    assert data[0]["actions"][0]["shopping_item_id"] == 5
+    mock_fn.assert_awaited_once_with(mock_client, [{"product_id": 12, "amount": 2}], 2)

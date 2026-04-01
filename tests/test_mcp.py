@@ -1,5 +1,6 @@
 """Tests for the MCP server."""
 
+from contextlib import asynccontextmanager
 from unittest.mock import MagicMock
 
 import pytest
@@ -69,3 +70,37 @@ async def test_entity_create_tool_invalid_json_returns_clear_error():
 
     with pytest.raises(Exception, match="Invalid JSON for data"):
         await mcp.call_tool("entity_create_tool", {"entity": "products", "data": "{bad"})
+
+
+async def test_workflow_match_products_preview_tool_invalid_json_returns_clear_error():
+    mcp = create_mcp_server()
+
+    with pytest.raises(Exception, match="Invalid JSON for items"):
+        await mcp.call_tool("workflow_match_products_preview_tool", {"items": "{bad"})
+
+
+async def test_workflow_match_products_preview_tool_returns_structured_data(monkeypatch):
+    mcp = create_mcp_server()
+
+    @asynccontextmanager
+    async def fake_client():
+        class Client:
+            async def get_objects(self, entity: str):
+                if entity == "products":
+                    return [{"id": 12, "name": "Whole Milk"}]
+                if entity == "product_barcodes":
+                    return [{"id": 2, "product_id": 12, "barcode": "5000112637922"}]
+                return []
+
+        yield Client()
+
+    monkeypatch.setattr("grocy_mcp.mcp.server._get_client", fake_client)
+
+    result = await mcp.call_tool(
+        "workflow_match_products_preview_tool",
+        {"items": '[{"label": "whole milk", "quantity": 2, "barcode": "5000112637922"}]'},
+    )
+
+    preview = result.structured_content["result"]
+    assert preview[0]["status"] == "matched"
+    assert preview[0]["matched_product_id"] == 12
