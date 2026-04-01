@@ -159,6 +159,7 @@ grocy shopping update 12 '{"amount": 2, "note": "discount brand"}'
 grocy shopping remove 12
 grocy shopping clear --list-id 1
 grocy shopping add-missing --list-id 1
+grocy shopping add "Oat Milk" --amount 2 --list-id 2 --note "for breakfast"
 
 # Recipes
 grocy recipes list
@@ -171,6 +172,7 @@ grocy recipes create "Pancakes" --description "Weekend breakfast" --ingredients 
 # Chores
 grocy chores list
 grocy chores overdue
+grocy chores execute "Vacuum living room"
 grocy chores execute "Vacuum living room" --done-by 1
 grocy chores undo "Vacuum living room"
 grocy chores create "Water plants"
