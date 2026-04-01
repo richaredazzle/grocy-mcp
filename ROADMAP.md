@@ -1,95 +1,148 @@
 # Roadmap
 
-This is a practical next-step list for turning `grocy-mcp` into a stronger MCP server and CLI for Grocy.
+This roadmap focuses on what is still worth doing now that the project already has:
 
-The goal is not just "more features," but a smoother day-to-day operator experience for both AI agents and humans.
+- broad stock, shopping, recipe, chore, location, task, meal-plan, and entity coverage
+- both MCP and CLI interfaces
+- CI, changelog, contributing docs, and better GitHub polish
 
-## Priority 1: Close correctness and UX gaps
+The remaining work is less about "add more commands" and more about turning `grocy-mcp` into the version people can trust as their default Grocy interface.
 
-- [ ] Make sure every CLI and MCP option is actually wired through to the client layer.
-- [ ] Remove or implement any advertised behavior that is currently partial or misleading.
-- [ ] Audit help text, examples, and runtime errors so they always match real behavior.
-- [ ] Add regression tests for argument-heavy commands such as shopping-list notes, list IDs, recipe creation, and chore execution metadata.
-- [ ] Standardize command output formatting so confirmations and list views feel consistent across domains.
+## Coverage reality check
 
-## Priority 2: Improve the MCP experience for AI agents
+Based on Grocy's public site and official OpenAPI surface, `grocy-mcp` already covers a meaningful core of Grocy:
 
-- [ ] Review tool names, parameter names, and descriptions for agent readability and predictability.
-- [ ] Add clearer parameter docs for JSON-accepting tools such as shopping updates and entity management.
-- [ ] Consider returning more structured output for MCP where it helps agents reason better, while keeping the CLI human-friendly.
-- [ ] Add examples of high-value agent workflows in the docs.
-- [ ] Evaluate whether some large generic operations should be split into safer, more task-specific MCP tools.
+- stock operations
+- shopping list workflows
+- recipes
+- chores
+- tasks
+- locations
+- meal plan
+- generic entity CRUD for exposed entities
 
-## Priority 3: Make the CLI excellent
+However, Grocy's API and UI also expose additional surfaces that are not yet first-class in this project and should shape the next roadmap:
 
-- [ ] Add shell-friendly output options for users who want scripting and automation support.
-- [ ] Add top-level config flags if they are worth supporting consistently.
-- [ ] Improve validation and error messaging for malformed JSON arguments.
-- [ ] Add command aliases only where they reduce friction without creating ambiguity.
-- [ ] Improve list rendering for long outputs, especially stock and shopping views.
+- batteries
+- equipment
+- calendar-oriented views
+- files and attachments
+- print/export workflows
+- shopping list metadata such as shopping lists and shopping locations
+- quantity units and quantity-unit conversions
+- task categories
+- meal-plan sections
+- recipe nestings
+- product groups and price-history/last-purchased views
+- stock-current-location and richer stock journal/reporting data
+- user/current-user and assignment-aware flows
+- advanced generic entities such as userfields, userentities, and userobjects
 
-## Priority 4: Expand Grocy coverage
+## North Star
 
-Potential feature areas that would make the project much more complete:
+An excellent `grocy-mcp` should feel like:
 
-- [ ] Product groups and quantity units
-- [ ] Locations and stores
-- [ ] Meal plans
-- [ ] Batteries
-- [ ] Equipment
-- [ ] Tasks and calendars
-- [ ] User management / assignment-aware operations where Grocy supports them
-- [ ] Stock journal / history views
-- [ ] Purchase and price workflows
-- [ ] Better barcode and search flows
+- the best Grocy MCP server for AI agents
+- a CLI that is pleasant for daily human use and robust for scripting
+- a project where docs, behavior, tests, and release quality stay aligned
+- a tool that covers the Grocy workflows people actually do every week
 
-## Priority 5: Better recipe and shopping workflows
+## Priority 1: Reliability and consistency
 
-- [ ] Add richer recipe creation and editing flows.
-- [ ] Support recipe ingredient resolution by product name, not only product ID.
-- [ ] Improve shopping-list update ergonomics so common edits do not require raw JSON.
-- [ ] Add a "plan meal -> add missing items -> review shopping list" end-to-end workflow.
-- [ ] Add optional dry-run or preview flows before destructive updates.
+- [ ] Audit every CLI command and MCP tool so equivalent operations behave consistently across both surfaces.
+- [ ] Standardize output shapes for JSON mode where similar commands currently return differently structured payloads.
+- [ ] Add regression tests for every command/tool that accepts JSON input or optional flags with non-obvious behavior.
+- [ ] Add stronger integration coverage against a real Grocy instance for the highest-risk flows:
+  stock add/consume/transfer, shopping updates, recipe creation/editing, chores execution, tasks, and meal-plan shopping.
+- [ ] Add explicit compatibility notes for supported Grocy versions and document any known API quirks by version.
 
-## Priority 6: Reliability and testing
+## Priority 2: Best-in-class MCP ergonomics
 
-- [ ] Add more CLI tests that assert actual async command behavior, not only command registration.
-- [ ] Add focused tests for retry logic and transport errors.
-- [ ] Add integration-test support against a real Grocy instance behind opt-in environment variables.
-- [ ] Add coverage for ambiguous name resolution and edge-case entity payloads.
-- [ ] Add CI checks for linting, tests, and package build verification.
+- [ ] Review all tool names and descriptions from an AI-agent perspective and simplify any confusing or overly technical wording.
+- [ ] Decide where MCP should return richer structured data instead of formatted strings, especially for search, detail, fulfillment, and journal-style tools.
+- [ ] Add safer low-level entity tooling guidance so agents know when to prefer domain-specific tools over generic CRUD.
+- [ ] Add examples of agent workflows that chain tools together for common household tasks:
+  weekly restock, cook-from-stock, meal-plan-to-shopping, overdue-chore sweep, and pantry audit.
+- [ ] Consider separating "read" tools from "mutating" tools more clearly in naming and docs to reduce accidental writes.
 
-## Priority 7: Packaging and release maturity
+## Priority 3: Excellent CLI experience
 
-- [ ] Add a changelog.
-- [ ] Add release automation for PyPI publishing.
-- [ ] Add GitHub Actions for tests and lint on pull requests.
-- [ ] Verify package metadata, classifiers, and long-description rendering on PyPI.
-- [ ] Add versioning and release notes discipline before a broader public launch.
+- [ ] Make JSON mode fully intentional and documented: define which commands support it, what shape they return, and where stability is guaranteed.
+- [ ] Add shell-friendly examples for `jq`, PowerShell, and simple automation scripts.
+- [ ] Improve help text for commands with JSON arguments by showing one realistic example per command.
+- [ ] Add validation for user-facing inputs such as dates, entity actions, and enum-like arguments before the request reaches Grocy.
+- [ ] Review whether a few carefully chosen aliases would improve ergonomics without creating ambiguity.
 
-## Priority 8: GitHub/project polish
+## Priority 4: Fill the highest-value Grocy domain gaps
 
-- [ ] Add badges for PyPI, Python versions, tests, and license.
-- [ ] Add issue templates for bugs and feature requests.
-- [ ] Add a contribution guide.
-- [ ] Add architecture diagrams or workflow examples in docs.
-- [ ] Add a troubleshooting section for common Grocy URL/auth/config mistakes.
+The project is already broad. The next domain work should be selected based on real day-to-day usefulness:
 
-## What "optimal" looks like
+- [ ] Batteries as a first-class domain:
+  list, details, charge/replacement tracking, cycle history, and overdue battery views.
+- [ ] Equipment as a first-class domain:
+  list, create/update flows, linked batteries, manuals/files, and maintenance-oriented workflows.
+- [ ] Shopping metadata support:
+  shopping lists, shopping locations, and better multi-list workflows.
+- [ ] Product groups, quantity units, and quantity-unit conversions as dedicated tools/commands.
+- [ ] Better purchase and price-history workflows using Grocy's last-purchased and average-price data.
+- [ ] More complete recipe editing and recipe-position metadata support, including recipe nestings where useful.
+- [ ] Richer meal-plan operations:
+  bulk planning, date-range inspection, replace/move entries, section support, and plan previews.
+- [ ] Task categories and assignment-aware task/chore workflows where Grocy supports them.
+- [ ] Calendar-oriented views that combine chores, batteries, meal-plan items, and tasks into one planning surface.
 
-An excellent `grocy-mcp` would feel like:
+## Priority 5: Files, print, and companion surfaces
 
-- a dependable MCP server that AI agents can use safely and predictably
-- a CLI that is fast, clear, and scriptable
-- a project whose docs make onboarding easy
-- a tool that covers the Grocy workflows people actually use every day
+- [ ] Support Grocy file groups where they add real value:
+  recipe pictures, product pictures, equipment manuals, and user files.
+- [ ] Evaluate whether print/export endpoints are useful enough to expose through MCP and CLI.
+- [ ] Add document- and attachment-aware workflows where they reduce context switching from Grocy's UI.
+
+## Priority 6: Search, resolution, and discoverability
+
+- [ ] Make name resolution smarter while staying predictable:
+  better ambiguity messages, optional stricter matching modes, and clearer suggestions.
+- [ ] Add richer search outputs for products, recipes, chores, locations, and tasks.
+- [ ] Improve barcode flows so users can move naturally between barcode lookup, product info, and stock actions.
+- [ ] Add a "describe this entity type" or "discover fields" capability for safer generic entity usage.
+- [ ] Add API-backed discovery helpers for supported Grocy entities, tags, and field shapes so agents can reason safely about generic CRUD.
+
+## Priority 7: Documentation that stays true
+
+- [ ] Keep one clearly current design/implementation doc pair and explicitly mark older specs as historical.
+- [ ] Add a short "Which interface should I use?" section comparing MCP, CLI, and generic entity tools.
+- [ ] Add a "common workflows" guide that shows the same task done through CLI and MCP.
+- [ ] Add troubleshooting for Grocy-specific issues:
+  reverse proxies, API permissions, object-field mismatches, and version differences.
+- [ ] Add contributor guidance for keeping docs aligned whenever commands or tool behavior change.
+- [ ] Add a coverage matrix showing:
+  current first-class support, generic-entity-only support, and not-yet-covered Grocy surfaces.
+
+## Priority 8: Release and maintenance maturity
+
+- [ ] Define a stable pre-1.0 compatibility promise for command names, tool names, and JSON output expectations.
+- [ ] Add release checklists covering docs, changelog, tests, packaging, and MCP/CLI parity review.
+- [ ] Publish example configs for Claude Desktop, Claude Code, and generic MCP HTTP clients.
+- [ ] Add a lightweight support policy for bug reports:
+  what environment details to include, which Grocy versions are expected, and how to provide reproducible payloads.
+
+## What "complete enough for 1.0" looks like
+
+The project is ready for a confident `1.0` when all of the following feel true:
+
+- command and tool behavior is predictable and well-tested
+- JSON mode is documented and stable enough for scripting
+- the most common Grocy household workflows are covered without needing generic CRUD as a fallback
+- MCP docs help agents choose the right tool on the first try
+- contributor docs make it hard for implementation and docs to drift apart
 
 ## Suggested execution order
 
-If working incrementally, the best order is:
+If we want the highest payoff path from here, the best order is:
 
-1. correctness and CLI/MCP alignment
-2. agent ergonomics and CLI usability
-3. test and CI maturity
-4. broader Grocy feature coverage
-5. packaging and project polish
+1. reliability and consistency
+2. MCP ergonomics plus JSON/output stability
+3. CLI usability and validation
+4. highest-value Grocy domain gaps from the official API surface
+5. search/discovery and coverage matrix work
+6. documentation discipline and 1.0 release readiness
