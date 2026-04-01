@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import httpx
 import pytest
+from fastmcp.client.client import CallToolResult as FastMcpCallToolResult
 
 from testbed.evaluators.state import assert_expected_outcome
 from testbed.loaders import load_confirmation, load_expected_outcome, load_manifest
 from testbed.models import ExpectedOutcome, MutationExpectation, ScenarioConfirmation
 from testbed.runners.common import build_stock_apply_items, flatten_shopping_actions
+from testbed.runners.run_scenario import _StdioMcpRunner
 from testbed.runners.run_suite import run_suite
 from testbed.seed.manage import _compose_env, _create_named_entities, wait_for_grocy
 from testbed.seed.session import _LoginFormParser
@@ -248,6 +251,36 @@ def test_flatten_shopping_actions_strips_preview_only_fields():
         {"shopping_item_id": 1, "action": "remove"},
         {"shopping_item_id": 2, "action": "set_amount", "new_amount": 1},
     ]
+
+
+@pytest.mark.asyncio
+async def test_stdio_runner_unwraps_fastmcp_call_tool_result():
+    runner = _StdioMcpRunner(
+        SimpleNamespace(
+            mcp_bin="grocy-mcp",
+            root_dir=Path.cwd(),
+            proxy_url="http://grocy.test",
+            proxy_api_key="testbed-demo-key",
+        )
+    )
+
+    class FakeClient:
+        async def call_tool(self, tool_name: str, arguments: dict[str, object]):
+            assert tool_name == "workflow_match_products_preview_tool"
+            assert arguments == {"items": "[]"}
+            return FastMcpCallToolResult(
+                content=[],
+                structured_content={"result": [{"input_index": 0, "status": "matched"}]},
+                meta=None,
+                data=[{"input_index": 0, "status": "matched"}],
+                is_error=False,
+            )
+
+    runner.client = FakeClient()
+
+    result = await runner.call("workflow_match_products_preview_tool", items="[]")
+
+    assert result == [{"input_index": 0, "status": "matched"}]
 
 
 @pytest.mark.asyncio

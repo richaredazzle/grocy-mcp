@@ -31,6 +31,14 @@ from testbed.utils import ensure_dir, hash_text
 
 
 def _structured_result(payload: object) -> object:
+    data = getattr(payload, "data", None)
+    if data is not None:
+        return data
+    structured_content = getattr(payload, "structured_content", None)
+    if structured_content is not None:
+        if isinstance(structured_content, dict) and "result" in structured_content:
+            return structured_content["result"]
+        return structured_content
     if isinstance(payload, dict) and "result" in payload:
         return payload["result"]
     return payload
