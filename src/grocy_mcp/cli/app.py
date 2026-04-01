@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Optional
 
 import typer
 
@@ -210,7 +209,7 @@ def cmd_shopping_add(
     product: str = typer.Argument(..., help="Product name or ID."),
     amount: float = typer.Option(1.0, "--amount", help="Quantity to add."),
     list_id: int = typer.Option(1, "--list-id", help="Shopping list ID."),
-    note: Optional[str] = typer.Option(None, "--note", help="Optional note."),
+    note: str | None = typer.Option(None, "--note", help="Optional note."),
 ) -> None:
     """Add a product to the shopping list."""
     async def _inner():
@@ -351,7 +350,7 @@ def cmd_chores_overdue() -> None:
 @chores_app.command("execute")
 def cmd_chore_execute(
     chore: str = typer.Argument(..., help="Chore name or ID."),
-    done_by: Optional[int] = typer.Option(None, "--done-by", help="User ID who completed the chore."),
+    done_by: int | None = typer.Option(None, "--done-by", help="User ID who completed the chore."),
 ) -> None:
     """Mark a chore as done."""
     async def _inner():
@@ -404,7 +403,7 @@ def cmd_entity_list(entity: str = typer.Argument(..., help="Entity type (e.g. 'p
 def cmd_entity_manage(
     entity: str = typer.Argument(..., help="Entity type (e.g. 'products')."),
     action: str = typer.Argument(..., help="Action: create, update, or delete."),
-    obj_id: Optional[int] = typer.Option(None, "--id", help="Object ID (required for update/delete)."),
+    obj_id: int | None = typer.Option(None, "--id", help="Object ID (required for update/delete)."),
     data: str = typer.Option("{}", "--data", help='JSON string of fields (e.g. \'{"name": "Pantry"}\').'),
 ) -> None:
     """Create, update, or delete a Grocy entity object."""

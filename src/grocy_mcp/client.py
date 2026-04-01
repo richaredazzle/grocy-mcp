@@ -178,20 +178,6 @@ class GrocyClient:
     async def add_recipe_to_shopping_list(self, recipe_id: int) -> None:
         await self._request("POST", f"/recipes/{recipe_id}/add-not-fulfilled-products-to-shoppinglist")
 
-    async def search_products(self, query: str) -> list[dict]:
-        products = await self.get_objects("products")
-        query_lower = query.lower()
-        matches = [p for p in products if query_lower in p.get("name", "").lower()]
-        barcodes = await self.get_objects("product_barcodes")
-        barcode_ids = {b["product_id"] for b in barcodes if query_lower in b.get("barcode", "").lower()}
-        for p in products:
-            if p["id"] in barcode_ids and p not in matches:
-                matches.append(p)
-        return matches
-
-    async def update_recipe(self, recipe_id: int, data: dict) -> None:
-        await self.update_object("recipes", recipe_id, data)
-
     # --- Chores ---
 
     async def get_chores(self) -> list[dict]:

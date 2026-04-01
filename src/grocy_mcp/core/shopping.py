@@ -16,7 +16,7 @@ async def shopping_list_view(client: GrocyClient, list_id: int = 1) -> str:
     """Return a formatted view of the shopping list."""
     items = await client.get_shopping_list(list_id)
     if not items:
-        return "Shopping list is empty."
+        return "No shopping list items found."
 
     name_map = await _product_name_map(client)
 
@@ -26,7 +26,7 @@ async def shopping_list_view(client: GrocyClient, list_id: int = 1) -> str:
         name = name_map.get(product_id, f"Product {product_id}")
         amount = item.get("amount", 1)
         note = item.get("note")
-        line = f"  [{item['id']}] {name}: {amount}"
+        line = f"  [{item['id']}] {name} — {amount}"
         if note:
             line += f" ({note})"
         lines.append(line)

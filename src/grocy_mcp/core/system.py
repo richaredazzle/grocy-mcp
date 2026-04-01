@@ -25,7 +25,7 @@ async def entity_list(client: GrocyClient, entity: str) -> str:
     """List all objects of a given entity type."""
     items = await client.get_objects(entity)
     if not items:
-        return f"No {entity} found (empty)."
+        return f"No {entity} found."
 
     lines = [f"{entity} ({len(items)} item(s)):"]
     for item in items:

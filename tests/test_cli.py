@@ -59,3 +59,109 @@ def test_chores_list_command():
     assert result.exit_code == 0
     assert "ok" in result.output
     mock_chores_list.assert_awaited_once_with(mock_client)
+
+
+def test_shopping_add_with_all_options():
+    with patch(
+        "grocy_mcp.cli.app.shopping_list_add", new_callable=AsyncMock
+    ) as mock_add:
+        mock_add.return_value = "ok"
+        with patch("grocy_mcp.cli.app._client") as mock_client_factory:
+            mock_client = MagicMock()
+            mock_client_factory.return_value.__aenter__.return_value = mock_client
+            result = runner.invoke(
+                app,
+                ["shopping", "add", "Butter", "--amount", "3", "--list-id", "2", "--note", "salted"],
+            )
+
+    assert result.exit_code == 0
+    mock_add.assert_awaited_once_with(mock_client, "Butter", 3.0, 2, "salted")
+
+
+def test_chore_execute_with_done_by():
+    with patch(
+        "grocy_mcp.cli.app.chore_execute", new_callable=AsyncMock
+    ) as mock_execute:
+        mock_execute.return_value = "ok"
+        with patch("grocy_mcp.cli.app._client") as mock_client_factory:
+            mock_client = MagicMock()
+            mock_client_factory.return_value.__aenter__.return_value = mock_client
+            result = runner.invoke(
+                app, ["chores", "execute", "Vacuum", "--done-by", "7"]
+            )
+
+    assert result.exit_code == 0
+    mock_execute.assert_awaited_once_with(mock_client, "Vacuum", 7)
+
+
+def test_recipe_create_with_description_and_ingredients():
+    with patch(
+        "grocy_mcp.cli.app.recipe_create", new_callable=AsyncMock
+    ) as mock_create:
+        mock_create.return_value = "ok"
+        with patch("grocy_mcp.cli.app._client") as mock_client_factory:
+            mock_client = MagicMock()
+            mock_client_factory.return_value.__aenter__.return_value = mock_client
+            result = runner.invoke(
+                app,
+                [
+                    "recipes", "create", "Pasta",
+                    "--description", "Italian pasta",
+                    "--ingredients", '[{"product_id": 1, "amount": 2}]',
+                ],
+            )
+
+    assert result.exit_code == 0
+    mock_create.assert_awaited_once_with(
+        mock_client, "Pasta", "Italian pasta", [{"product_id": 1, "amount": 2}]
+    )
+
+
+def test_entity_manage_create():
+    with patch(
+        "grocy_mcp.cli.app.entity_manage", new_callable=AsyncMock
+    ) as mock_manage:
+        mock_manage.return_value = "ok"
+        with patch("grocy_mcp.cli.app._client") as mock_client_factory:
+            mock_client = MagicMock()
+            mock_client_factory.return_value.__aenter__.return_value = mock_client
+            result = runner.invoke(
+                app,
+                ["entity", "manage", "products", "create", "--data", '{"name": "Oat Milk"}'],
+            )
+
+    assert result.exit_code == 0
+    mock_manage.assert_awaited_once_with(
+        mock_client, "products", "create", None, {"name": "Oat Milk"}
+    )
+
+
+def test_entity_manage_delete():
+    with patch(
+        "grocy_mcp.cli.app.entity_manage", new_callable=AsyncMock
+    ) as mock_manage:
+        mock_manage.return_value = "ok"
+        with patch("grocy_mcp.cli.app._client") as mock_client_factory:
+            mock_client = MagicMock()
+            mock_client_factory.return_value.__aenter__.return_value = mock_client
+            result = runner.invoke(
+                app,
+                ["entity", "manage", "products", "delete", "--id", "5"],
+            )
+
+    assert result.exit_code == 0
+    mock_manage.assert_awaited_once_with(mock_client, "products", "delete", 5, None)
+
+
+def test_shopping_view_with_list_id():
+    with patch(
+        "grocy_mcp.cli.app.shopping_list_view", new_callable=AsyncMock
+    ) as mock_view:
+        mock_view.return_value = "ok"
+        with patch("grocy_mcp.cli.app._client") as mock_client_factory:
+            mock_client = MagicMock()
+            mock_client_factory.return_value.__aenter__.return_value = mock_client
+            result = runner.invoke(app, ["shopping", "view", "--list-id", "3"])
+
+    assert result.exit_code == 0
+    mock_view.assert_awaited_once_with(mock_client, 3)
