@@ -1,7 +1,11 @@
 # grocy-mcp Design Spec
 
 **Date:** 2026-03-31
-**Status:** Approved
+**Status:** Historical
+
+> Historical snapshot retained for context. For the current design and implementation state, see:
+> - [2026-04-01-grocy-mcp-design.md](C:/Workspace/grocy-mcp/docs/specs/2026-04-01-grocy-mcp-design.md)
+> - [2026-04-01-grocy-mcp-implementation.md](C:/Workspace/grocy-mcp/docs/specs/2026-04-01-grocy-mcp-implementation.md)
 
 ## Overview
 
@@ -44,7 +48,7 @@ Three layers with clear boundaries:
 - **GrocyClient** -- thin async httpx wrapper. Handles auth, base URL, error mapping. ~200 lines.
 - **Core** -- business logic modules (stock, shopping, recipes, chores, system). Uses the client. Shared by both interfaces.
 - **MCP Server** -- FastMCP server exposing 30 tools. Stdio by default, Streamable HTTP via flag.
-- **CLI App** -- Typer app with subcommands. Bridges async via `asyncio.run()` and prints human-readable text output.
+- **CLI App** -- Typer app with subcommands. Bridges async via `asyncio.run()`.
 
 ## Project Structure
 
@@ -174,7 +178,7 @@ Central to AI agent usability. All MCP tools and CLI commands accept human-reada
 4. **Exactly one match** -- use it.
 5. **Multiple matches** -- if one is an exact match (case-insensitive), use it. Otherwise return an error listing the matches: "Multiple products match 'Milk': Milk (ID 1), Milk 2% (ID 5), Almond Milk (ID 12). Please be more specific."
 
-**Applies to:** Products, recipes, chores, and locations. Each core module has a `resolve_<entity>(client, name_or_id)` helper.
+**Applies to:** Products, recipes, chores, locations, shopping lists (by name). Each core module has a `resolve_<entity>(client, name_or_id)` helper.
 
 **No fuzzy matching library needed** -- simple substring matching is sufficient and predictable. AI agents can retry with the suggested names from error messages.
 
@@ -239,65 +243,67 @@ Central to AI agent usability. All MCP tools and CLI commands accept human-reada
 
 ### Design decisions
 
-- **Name-based lookups** -- tools like `stock_add` accept product names, not just IDs. The core layer resolves names to IDs via case-insensitive substring matching with exact-match priority. This is essential for AI agent usability.
+- **Name-based lookups** -- tools like `stock_add` accept product names, not just IDs. The core layer resolves names to IDs via fuzzy search against the product list. This is essential for AI agent usability.
 - **Sensible defaults** -- shopping list defaults to list 1, stock_open defaults to amount 1, etc.
-- **Structured returns** -- tools return formatted, human-readable text (not raw JSON). Summaries and confirmation messages are optimized for terminal and MCP usage.
+- **Structured returns** -- tools return formatted, human-readable text (not raw JSON). Summaries, tables, confirmation messages.
 
 ## CLI Structure
 
-Six top-level command groups:
+Four top-level command groups plus utilities:
 
 ```
-grocy stock overview
+grocy stock list
 grocy stock expiring
 grocy stock info <product>
 grocy stock add <product> <amount>
 grocy stock consume <product> <amount>
-grocy stock transfer <product> <amount> <to_location>
-grocy stock inventory <product> <new_amount>
+grocy stock transfer <product> <amount> --to <location>
+grocy stock inventory <product> <amount>
 grocy stock open <product> [amount]
 grocy stock search <query>
 grocy stock barcode <barcode>
 
-grocy shopping view [--list-id <list_id>]
-grocy shopping add <product> [--amount <amount>] [--list-id <list_id>] [--note "..."]
-grocy shopping update <item_id> '{"amount": 3}'
+grocy shopping list [list_id]
+grocy shopping add <product> [amount]
 grocy shopping remove <item>
-grocy shopping clear [--list-id <list_id>]
-grocy shopping add-missing [--list-id <list_id>]
+grocy shopping clear [list_id]
+grocy shopping add-missing
 
 grocy recipes list
-grocy recipes details <recipe>
-grocy recipes fulfillment <recipe>
+grocy recipes show <recipe>
+grocy recipes check <recipe>
 grocy recipes consume <recipe>
-grocy recipes add-to-shopping <recipe>
-grocy recipes create <name> [--description "..."] [--ingredients '[{"product_id": 1, "amount": 2}]']
+grocy recipes to-shopping <recipe>
+grocy recipes create <name>
 
 grocy chores list
 grocy chores overdue
-grocy chores execute <chore> [--done-by <user_id>]
+grocy chores done <chore> [--by <person>]
 grocy chores undo <chore>
 grocy chores create <name>
 
+grocy shopping update <item_id> --amount <n> --note "..."
+
 grocy system info
 grocy entity list <type>
-grocy entity manage <type> create --data '{...}'
-grocy entity manage <type> update --id <id> --data '{...}'
-grocy entity manage <type> delete --id <id>
+grocy entity create <type> --data '{...}'
+grocy entity update <type> <id> --data '{...}'
+grocy entity delete <type> <id>
 ```
 
 ### Design decisions
 
 - **Positional args for common cases** -- `grocy stock add Milk 2` works without flags.
-- **Output format** -- the CLI prints human-readable text returned by the shared core layer.
+- **Output formats** -- human-friendly tables via `rich` by default. `--json` flag for machine-readable output.
 - **Async bridge** -- CLI uses `asyncio.run()` to call the same async core modules the MCP server uses.
 
 ## Configuration
 
 Single config system shared by MCP and CLI. Priority (highest to lowest):
 
-1. Environment variables (`GROCY_URL`, `GROCY_API_KEY`)
-2. Config file (cross-platform via `platformdirs`: `~/.config/grocy-mcp/config.toml` on Linux, `%APPDATA%/grocy-mcp/config.toml` on Windows, `~/Library/Application Support/grocy-mcp/config.toml` on macOS)
+1. CLI flags (`--url`, `--api-key`)
+2. Environment variables (`GROCY_URL`, `GROCY_API_KEY`)
+3. Config file (cross-platform via `platformdirs`: `~/.config/grocy-mcp/config.toml` on Linux, `%APPDATA%/grocy-mcp/config.toml` on Windows, `~/Library/Application Support/grocy-mcp/config.toml` on macOS)
 
 Config file format:
 ```toml
@@ -337,6 +343,7 @@ api_key = "your-api-key"
 - `fastmcp` -- MCP server framework
 - `typer` -- CLI framework
 - `pydantic` -- data validation and models
+- `rich` -- terminal output formatting (installed with typer)
 - `platformdirs` -- cross-platform config file paths
 
 **Python:** 3.11+
