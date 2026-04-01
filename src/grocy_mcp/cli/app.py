@@ -11,11 +11,15 @@ from grocy_mcp.client import GrocyClient
 from grocy_mcp.config import load_config
 from grocy_mcp.core.chores import chore_create, chore_execute, chore_undo, chores_list, chores_overdue
 from grocy_mcp.core.recipes import (
+    recipe_add_ingredient,
     recipe_add_to_shopping,
     recipe_consume,
+    recipe_consume_preview,
     recipe_create,
     recipe_details,
     recipe_fulfillment,
+    recipe_remove_ingredient,
+    recipe_update,
     recipes_list,
 )
 from grocy_mcp.core.shopping import (
@@ -23,6 +27,8 @@ from grocy_mcp.core.shopping import (
     shopping_list_add_missing,
     shopping_list_clear,
     shopping_list_remove,
+    shopping_list_set_amount,
+    shopping_list_set_note,
     shopping_list_update,
     shopping_list_view,
 )
@@ -39,7 +45,7 @@ from grocy_mcp.core.stock import (
     stock_transfer,
 )
 from grocy_mcp.core.locations import location_create, locations_list
-from grocy_mcp.core.meal_plan import meal_plan_add, meal_plan_list, meal_plan_remove
+from grocy_mcp.core.meal_plan import meal_plan_add, meal_plan_list, meal_plan_remove, meal_plan_shopping
 from grocy_mcp.core.stock_journal import stock_journal
 from grocy_mcp.core.system import entity_list, entity_manage, system_info
 from grocy_mcp.core.tasks import task_complete, task_create, task_delete, tasks_list
@@ -332,6 +338,30 @@ def cmd_shopping_add_missing(
     _exec(_inner())
 
 
+@shopping_app.command("set-amount")
+def cmd_shopping_set_amount(
+    item_id: int = typer.Argument(..., help="Shopping list item ID."),
+    amount: float = typer.Argument(..., help="New quantity."),
+) -> None:
+    """Set the quantity for a shopping list item."""
+    async def _inner():
+        async with _client() as client:
+            return await shopping_list_set_amount(client, item_id, amount)
+    _exec(_inner())
+
+
+@shopping_app.command("set-note")
+def cmd_shopping_set_note(
+    item_id: int = typer.Argument(..., help="Shopping list item ID."),
+    note: str = typer.Argument(..., help="New note text."),
+) -> None:
+    """Set or update the note on a shopping list item."""
+    async def _inner():
+        async with _client() as client:
+            return await shopping_list_set_note(client, item_id, note)
+    _exec(_inner())
+
+
 # ------------------------------------------------------------------- Recipes
 
 
@@ -401,6 +431,54 @@ def cmd_recipe_create(
     async def _inner():
         async with _client() as client:
             return await recipe_create(client, name, description, parsed or None)
+    _exec(_inner())
+
+
+@recipes_app.command("update")
+def cmd_recipe_update(
+    recipe: str = typer.Argument(..., help="Recipe name or ID."),
+    name: str | None = typer.Option(None, "--name", help="New name."),
+    description: str | None = typer.Option(None, "--description", "-d", help="New description."),
+) -> None:
+    """Update a recipe's name or description."""
+    async def _inner():
+        async with _client() as client:
+            return await recipe_update(client, recipe, name, description)
+    _exec(_inner())
+
+
+@recipes_app.command("add-ingredient")
+def cmd_recipe_add_ingredient(
+    recipe: str = typer.Argument(..., help="Recipe name or ID."),
+    product: str = typer.Argument(..., help="Product name."),
+    amount: float = typer.Option(1.0, "--amount", "-a", help="Quantity."),
+) -> None:
+    """Add an ingredient to an existing recipe by product name."""
+    async def _inner():
+        async with _client() as client:
+            return await recipe_add_ingredient(client, recipe, product, amount)
+    _exec(_inner())
+
+
+@recipes_app.command("remove-ingredient")
+def cmd_recipe_remove_ingredient(
+    position_id: int = typer.Argument(..., help="Recipe ingredient position ID."),
+) -> None:
+    """Remove an ingredient from a recipe."""
+    async def _inner():
+        async with _client() as client:
+            return await recipe_remove_ingredient(client, position_id)
+    _exec(_inner())
+
+
+@recipes_app.command("preview")
+def cmd_recipe_consume_preview(
+    recipe: str = typer.Argument(..., help="Recipe name or ID."),
+) -> None:
+    """Preview what stock would be consumed without actually consuming."""
+    async def _inner():
+        async with _client() as client:
+            return await recipe_consume_preview(client, recipe)
     _exec(_inner())
 
 
@@ -598,6 +676,18 @@ def cmd_meal_plan_remove(
     async def _inner():
         async with _client() as client:
             return await meal_plan_remove(client, entry_id)
+    _exec(_inner())
+
+
+@meal_plan_app.command("shopping")
+def cmd_meal_plan_shopping(
+    start_date: str | None = typer.Option(None, "--from", help="Start date (YYYY-MM-DD)."),
+    end_date: str | None = typer.Option(None, "--to", help="End date (YYYY-MM-DD)."),
+) -> None:
+    """Add missing ingredients for all planned recipes to the shopping list."""
+    async def _inner():
+        async with _client() as client:
+            return await meal_plan_shopping(client, start_date, end_date)
     _exec(_inner())
 
 

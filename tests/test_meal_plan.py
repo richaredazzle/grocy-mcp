@@ -2,7 +2,7 @@
 
 from unittest.mock import AsyncMock, patch
 
-from grocy_mcp.core.meal_plan import meal_plan_add, meal_plan_list, meal_plan_remove
+from grocy_mcp.core.meal_plan import meal_plan_add, meal_plan_list, meal_plan_remove, meal_plan_shopping
 
 
 async def test_meal_plan_list():
@@ -60,3 +60,48 @@ async def test_meal_plan_remove():
     client.delete_object.assert_called_once_with("meal_plan", 3)
     assert "3" in result
     assert "removed" in result.lower()
+
+
+async def test_meal_plan_shopping():
+    client = AsyncMock()
+    client.get_objects.side_effect = [
+        # meal_plan entries
+        [
+            {"id": 1, "day": "2026-04-05", "recipe_id": 1, "type": "recipe"},
+            {"id": 2, "day": "2026-04-06", "recipe_id": 2, "type": "recipe"},
+            {"id": 3, "day": "2026-04-06", "recipe_id": None, "type": "note"},
+        ],
+        # recipes
+        [{"id": 1, "name": "Pancakes"}, {"id": 2, "name": "Omelette"}],
+    ]
+    client.add_recipe_to_shopping_list.return_value = None
+    result = await meal_plan_shopping(client)
+    assert client.add_recipe_to_shopping_list.call_count == 2
+    assert "Pancakes" in result
+    assert "Omelette" in result
+    assert "2 recipe(s)" in result
+
+
+async def test_meal_plan_shopping_date_filter():
+    client = AsyncMock()
+    client.get_objects.side_effect = [
+        [
+            {"id": 1, "day": "2026-04-05", "recipe_id": 1, "type": "recipe"},
+            {"id": 2, "day": "2026-04-10", "recipe_id": 2, "type": "recipe"},
+        ],
+        [{"id": 1, "name": "Pancakes"}, {"id": 2, "name": "Omelette"}],
+    ]
+    client.add_recipe_to_shopping_list.return_value = None
+    result = await meal_plan_shopping(client, start_date="2026-04-06", end_date="2026-04-12")
+    # Only recipe 2 should be included (day 2026-04-10 is in range)
+    assert client.add_recipe_to_shopping_list.call_count == 1
+    assert "1 recipe(s)" in result
+
+
+async def test_meal_plan_shopping_no_recipes():
+    client = AsyncMock()
+    client.get_objects.return_value = [
+        {"id": 1, "day": "2026-04-05", "recipe_id": None, "type": "note", "note": "Eat out"},
+    ]
+    result = await meal_plan_shopping(client)
+    assert "No recipes found" in result

@@ -13,11 +13,16 @@ from grocy_mcp.client import GrocyClient
 from grocy_mcp.config import load_config
 from grocy_mcp.core.chores import chore_create, chore_execute, chore_undo, chores_list, chores_overdue
 from grocy_mcp.core.recipes import (
+    recipe_add_ingredient,
     recipe_add_to_shopping,
     recipe_consume,
+    recipe_consume_preview,
     recipe_create,
+    recipe_create_by_name,
     recipe_details,
     recipe_fulfillment,
+    recipe_remove_ingredient,
+    recipe_update,
     recipes_list,
 )
 from grocy_mcp.core.shopping import (
@@ -25,6 +30,8 @@ from grocy_mcp.core.shopping import (
     shopping_list_add_missing,
     shopping_list_clear,
     shopping_list_remove,
+    shopping_list_set_amount,
+    shopping_list_set_note,
     shopping_list_update,
     shopping_list_view,
 )
@@ -41,7 +48,7 @@ from grocy_mcp.core.stock import (
     stock_transfer,
 )
 from grocy_mcp.core.locations import location_create, locations_list
-from grocy_mcp.core.meal_plan import meal_plan_add, meal_plan_list, meal_plan_remove
+from grocy_mcp.core.meal_plan import meal_plan_add, meal_plan_list, meal_plan_remove, meal_plan_shopping
 from grocy_mcp.core.stock_journal import stock_journal
 from grocy_mcp.core.system import entity_list, entity_manage, system_info
 from grocy_mcp.core.tasks import task_complete, task_create, task_delete, tasks_list
@@ -258,6 +265,34 @@ def create_mcp_server() -> FastMCP:
         async with _get_client() as client:
             return await shopping_list_add_missing(client, list_id)
 
+    @mcp.tool()
+    async def shopping_list_set_amount_tool(item_id: int, amount: float) -> str:
+        """Change the quantity for a shopping list item.
+
+        A simpler alternative to shopping_list_update_tool when you only
+        need to change the amount.
+
+        Args:
+            item_id: The shopping list item ID (from shopping_list_view_tool).
+            amount: New quantity.
+        """
+        async with _get_client() as client:
+            return await shopping_list_set_amount(client, item_id, amount)
+
+    @mcp.tool()
+    async def shopping_list_set_note_tool(item_id: int, note: str) -> str:
+        """Set or update the note on a shopping list item.
+
+        A simpler alternative to shopping_list_update_tool when you only
+        need to change the note.
+
+        Args:
+            item_id: The shopping list item ID (from shopping_list_view_tool).
+            note: The new note text (e.g. "organic", "2 for 1 deal").
+        """
+        async with _get_client() as client:
+            return await shopping_list_set_note(client, item_id, note)
+
     # ---------------------------------------------------------------- Recipes
 
     @mcp.tool()
@@ -334,6 +369,83 @@ def create_mcp_server() -> FastMCP:
         parsed_ingredients = json.loads(ingredients)
         async with _get_client() as client:
             return await recipe_create(client, name, description, parsed_ingredients or None)
+
+    @mcp.tool()
+    async def recipe_create_by_name_tool(
+        name: str, description: str = "", ingredients: str = "[]"
+    ) -> str:
+        """Create a recipe with ingredients specified by product name instead of ID.
+
+        This is the easier alternative to recipe_create_tool — you can use
+        product names directly, and they will be resolved automatically.
+
+        Args:
+            name: Recipe name (e.g. "Banana Bread").
+            description: Optional description or instructions.
+            ingredients: JSON array of ingredient objects. Each should have
+                         "product" (name string) and "amount" (number).
+                         Example: '[{"product": "Flour", "amount": 2}, {"product": "Banana", "amount": 3}]'.
+        """
+        parsed_ingredients = json.loads(ingredients)
+        async with _get_client() as client:
+            return await recipe_create_by_name(
+                client, name, description, parsed_ingredients or None
+            )
+
+    @mcp.tool()
+    async def recipe_update_tool(
+        recipe: str,
+        name: str | None = None,
+        description: str | None = None,
+    ) -> str:
+        """Update a recipe's name or description.
+
+        Args:
+            recipe: Current recipe name or ID to update.
+            name: New name (omit to keep current).
+            description: New description (omit to keep current).
+        """
+        async with _get_client() as client:
+            return await recipe_update(client, recipe, name, description)
+
+    @mcp.tool()
+    async def recipe_add_ingredient_tool(
+        recipe: str, product: str, amount: float = 1.0
+    ) -> str:
+        """Add an ingredient to an existing recipe using the product name.
+
+        Args:
+            recipe: Recipe name or ID.
+            product: Product name (e.g. "Flour") — resolved automatically.
+            amount: Quantity needed for the recipe (default 1).
+        """
+        async with _get_client() as client:
+            return await recipe_add_ingredient(client, recipe, product, amount)
+
+    @mcp.tool()
+    async def recipe_remove_ingredient_tool(position_id: int) -> str:
+        """Remove an ingredient from a recipe.
+
+        Use recipe_details_tool to see ingredient position IDs.
+
+        Args:
+            position_id: The recipe ingredient position ID to remove.
+        """
+        async with _get_client() as client:
+            return await recipe_remove_ingredient(client, position_id)
+
+    @mcp.tool()
+    async def recipe_consume_preview_tool(recipe: str) -> str:
+        """Preview what stock would be consumed without actually consuming.
+
+        Shows each ingredient, the amount needed, and whether there is
+        enough in stock. Use this before recipe_consume_tool to verify.
+
+        Args:
+            recipe: Recipe name or ID.
+        """
+        async with _get_client() as client:
+            return await recipe_consume_preview(client, recipe)
 
     # ----------------------------------------------------------------- Chores
 
@@ -523,6 +635,23 @@ def create_mcp_server() -> FastMCP:
         """
         async with _get_client() as client:
             return await meal_plan_remove(client, entry_id)
+
+    @mcp.tool()
+    async def meal_plan_shopping_tool(
+        start_date: str | None = None, end_date: str | None = None
+    ) -> str:
+        """Add missing ingredients for all planned recipes to the shopping list.
+
+        Scans the meal plan (optionally filtered by date range), finds all
+        scheduled recipes, and adds their unfulfilled ingredients to the
+        shopping list. This is the "plan meals → shop" workflow in one step.
+
+        Args:
+            start_date: Optional start date filter (YYYY-MM-DD, inclusive).
+            end_date: Optional end date filter (YYYY-MM-DD, inclusive).
+        """
+        async with _get_client() as client:
+            return await meal_plan_shopping(client, start_date, end_date)
 
     # ----------------------------------------------------------------- System
 

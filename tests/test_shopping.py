@@ -9,6 +9,8 @@ from grocy_mcp.core.shopping import (
     shopping_list_add_missing,
     shopping_list_clear,
     shopping_list_remove,
+    shopping_list_set_amount,
+    shopping_list_set_note,
     shopping_list_update,
     shopping_list_view,
 )
@@ -112,3 +114,17 @@ async def test_shopping_list_add_missing_with_list_id(mock_client):
     result = await shopping_list_add_missing(mock_client, list_id=2)
     mock_client.add_missing_products_to_shopping_list.assert_called_once_with(2)
     assert "#2" in result
+
+
+async def test_shopping_list_set_amount(mock_client):
+    result = await shopping_list_set_amount(mock_client, 5, 3.0)
+    mock_client.update_shopping_list_item.assert_called_once_with(5, {"amount": 3.0})
+    assert "5" in result
+    assert "3.0" in result
+
+
+async def test_shopping_list_set_note(mock_client):
+    result = await shopping_list_set_note(mock_client, 5, "organic")
+    mock_client.update_shopping_list_item.assert_called_once_with(5, {"note": "organic"})
+    assert "5" in result
+    assert "'organic'" in result

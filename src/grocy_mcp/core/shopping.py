@@ -55,6 +55,22 @@ async def shopping_list_update(
     return f"Shopping list item {item_id} updated."
 
 
+async def shopping_list_set_amount(
+    client: GrocyClient, item_id: int, amount: float
+) -> str:
+    """Set the amount for a shopping list item."""
+    await client.update_shopping_list_item(item_id, {"amount": amount})
+    return f"Shopping list item {item_id} amount set to {amount}."
+
+
+async def shopping_list_set_note(
+    client: GrocyClient, item_id: int, note: str
+) -> str:
+    """Set or update the note for a shopping list item."""
+    await client.update_shopping_list_item(item_id, {"note": note})
+    return f"Shopping list item {item_id} note set to '{note}'."
+
+
 async def shopping_list_remove(client: GrocyClient, item_id: int) -> str:
     """Remove a shopping list item by its ID."""
     await client.remove_shopping_list_item(item_id)
