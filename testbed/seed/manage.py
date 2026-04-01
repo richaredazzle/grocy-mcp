@@ -279,7 +279,37 @@ def bootstrap_demo_household(config: TestbedConfig, seed_profile_path: Path) -> 
         session.close()
 
 
+def compose_restart(config: TestbedConfig) -> None:
+    """Restart the Grocy container without destroying volumes."""
+    if not docker_available():
+        raise RuntimeError("Docker is required to manage the demo Grocy testbed.")
+    subprocess.run(
+        _compose_command(config, "restart"),
+        cwd=config.root_dir,
+        check=True,
+        capture_output=True,
+        env=_compose_env(),
+        text=True,
+    )
+
+
+def reset_demo_data(config: TestbedConfig, seed_profile_path: Path) -> list[str]:
+    """Reset demo data by restarting the container and re-seeding.
+
+    This is a lighter alternative to ``ensure_demo_environment`` that avoids a
+    full Docker Compose down/up cycle.  It deletes the Grocy database, restarts
+    the container so Grocy re-initialises an empty schema, then re-seeds.
+    """
+    db_path = config.runtime_dir / "grocy-data" / "data" / "grocy.db"
+    if db_path.exists():
+        db_path.unlink()
+    compose_restart(config)
+    wait_for_grocy(config.grocy_base_url, db_path)
+    return bootstrap_demo_household(config, seed_profile_path)
+
+
 def ensure_demo_environment(config: TestbedConfig, seed_profile_path: Path) -> list[str]:
+    """Perform a full Docker Compose lifecycle and seed the demo household."""
     compose_down(config)
     reset_runtime_dirs(config)
     compose_up(config)

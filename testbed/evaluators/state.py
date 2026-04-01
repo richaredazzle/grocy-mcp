@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 
 from grocy_mcp.client import GrocyClient
@@ -87,7 +88,9 @@ def assert_expected_outcome(
         assertions.append(
             {
                 "name": f"stock:{item.product}",
-                "passed": actual_amount == float(item.amount),
+                "passed": math.isclose(
+                    actual_amount, float(item.amount), rel_tol=1e-9, abs_tol=1e-9
+                ),
                 "expected": item.amount,
                 "actual": actual_amount,
             }
@@ -101,7 +104,9 @@ def assert_expected_outcome(
             assertions.append(
                 {
                     "name": f"shopping:{shopping_list.list_name}:{item.product}",
-                    "passed": actual_amount == float(item.amount),
+                    "passed": math.isclose(
+                        actual_amount, float(item.amount), rel_tol=1e-9, abs_tol=1e-9
+                    ),
                     "expected": item.amount,
                     "actual": actual_amount,
                 }

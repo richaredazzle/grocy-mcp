@@ -24,6 +24,7 @@ class AnthropicAdapter(ModelAdapter):
         source_metadata: dict[str, Any],
         prompt_template: str,
     ) -> list[dict]:
+        """Extract normalized grocery items via the Anthropic Messages API."""
         prompt = build_prompt(task_type, asset_ref, source_metadata, prompt_template)
         response = httpx.post(
             "https://api.anthropic.com/v1/messages",

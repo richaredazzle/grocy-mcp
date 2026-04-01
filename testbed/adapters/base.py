@@ -3,20 +3,22 @@
 from __future__ import annotations
 
 import json
+import re
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
 from testbed.utils import read_text
 
+_CODE_FENCE_RE = re.compile(r"^```[^\n]*\n(.*?)```\s*$", re.DOTALL)
+
 
 def _strip_code_fences(value: str) -> str:
-    stripped = value.strip()
-    if stripped.startswith("```"):
-        parts = stripped.split("```")
-        if len(parts) >= 3:
-            return parts[1].split("\n", 1)[-1].strip()
-    return stripped
+    """Remove a single Markdown code fence wrapper, if present."""
+    match = _CODE_FENCE_RE.match(value.strip())
+    if match:
+        return match.group(1).strip()
+    return value.strip()
 
 
 def parse_json_array(text: str) -> list[dict]:

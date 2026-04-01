@@ -33,6 +33,8 @@ jobs:
 
   testbed:
     runs-on: ubuntu-latest
+    env:
+      TESTBED_MANAGE_ENV: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

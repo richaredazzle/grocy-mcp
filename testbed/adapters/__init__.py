@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from testbed.adapters.anthropic import AnthropicAdapter
 from testbed.adapters.base import ModelAdapter
-from testbed.adapters.golden import GoldenAdapter
 from testbed.adapters.openai import OpenAIAdapter
 from testbed.adapters.openai_compatible import OpenAICompatibleAdapter
 from testbed.config import TestbedConfig
@@ -13,8 +12,11 @@ from testbed.config import TestbedConfig
 def create_adapter(
     source: str, config: TestbedConfig, provider_model: str | None = None
 ) -> ModelAdapter:
-    if source == "golden":
-        return GoldenAdapter()
+    """Create a provider-backed model adapter for extraction.
+
+    The ``"golden"`` source is handled directly by ``load_normalized_items``
+    and never reaches this factory.
+    """
     if source == "openai":
         if not config.openai_api_key:
             raise RuntimeError("OPENAI_API_KEY is not configured.")

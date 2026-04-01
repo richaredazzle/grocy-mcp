@@ -8,7 +8,7 @@ import asyncio
 from testbed.config import TestbedConfig
 from testbed.runners.common import source_ready
 from testbed.runners.run_scenario import run_scenario
-from testbed.seed.manage import ensure_demo_environment
+from testbed.seed.manage import ensure_demo_environment, reset_demo_data
 
 
 SUITES = {
@@ -47,14 +47,27 @@ SUITES = {
 
 
 async def run_suite(name: str) -> list[str]:
+    """Run every scenario in the named suite matrix.
+
+    When ``config.manage_environment`` is ``True`` the Docker-backed demo
+    environment is bootstrapped once before the first scenario, then reset
+    with a lightweight DB-wipe between subsequent scenarios (avoiding a full
+    Docker Compose down/up cycle each time).
+    """
     config = TestbedConfig.from_env()
     if name not in SUITES:
         raise RuntimeError(f"Unknown suite '{name}'.")
 
     warnings: list[str] = []
+    seed_profile = config.seed_dir / "demo_profile.json"
+    bootstrapped = False
     for scenario_id, mode, source, transport in SUITES[name]:
         if config.manage_environment:
-            warnings.extend(ensure_demo_environment(config, config.seed_dir / "demo_profile.json"))
+            if not bootstrapped:
+                warnings.extend(ensure_demo_environment(config, seed_profile))
+                bootstrapped = True
+            else:
+                warnings.extend(reset_demo_data(config, seed_profile))
         if not source_ready(source, config):
             warnings.append(f"Skipped {scenario_id}/{mode}/{source}: provider not configured.")
             continue

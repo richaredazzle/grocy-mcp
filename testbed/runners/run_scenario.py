@@ -15,7 +15,7 @@ from grocy_mcp.mcp.server import create_mcp_server
 from testbed.config import TestbedConfig
 from testbed.evaluators.report import write_report
 from testbed.evaluators.state import assert_expected_outcome, capture_state
-from testbed.models import RunReport
+from testbed.models import RunReport, ScenarioConfirmation, ScenarioManifest
 from testbed.runners.common import (
     build_stock_apply_items,
     flatten_shopping_actions,
@@ -30,25 +30,27 @@ from testbed.seed.auth_proxy import GrocyAuthProxy
 from testbed.utils import ensure_dir, hash_text
 
 
-def _structured_result(payload):
+def _structured_result(payload: object) -> object:
     if isinstance(payload, dict) and "result" in payload:
         return payload["result"]
     return payload
 
 
 class _InProcessMcpRunner:
+    """In-process FastMCP runner.
+
+    Requires ``GROCY_URL`` and ``GROCY_API_KEY`` to be set in ``os.environ``
+    **before** any calls are made.  The caller (``run_scenario``) is
+    responsible for scoping the environment via ``temporary_env`` once,
+    avoiding per-call env mutation that would race with the auth-proxy thread.
+    """
+
     def __init__(self, config: TestbedConfig) -> None:
         self.config = config
         self.server = create_mcp_server()
 
     async def call(self, tool_name: str, **arguments):
-        with temporary_env(
-            {
-                "GROCY_URL": self.config.proxy_url,
-                "GROCY_API_KEY": self.config.proxy_api_key,
-            }
-        ):
-            result = await self.server.call_tool(tool_name, arguments)
+        result = await self.server.call_tool(tool_name, arguments)
         return _structured_result(result.structured_content)
 
 
@@ -86,8 +88,8 @@ async def _product_map(client: GrocyClient) -> dict[str, int]:
 
 async def _resolve_shopping_list_id(
     client: GrocyClient,
-    manifest,
-    confirmation,
+    manifest: ScenarioManifest,
+    confirmation: ScenarioConfirmation,
 ) -> int | None:
     list_name = manifest.source_metadata.get("shopping_list_name") or confirmation.shopping_list
     if list_name:
@@ -104,10 +106,10 @@ async def _resolve_shopping_list_id(
 
 async def _receipt_stock_flow(
     mode: str,
-    manifest,
+    manifest: ScenarioManifest,
     config: TestbedConfig,
     normalized_items: list[dict],
-    confirmation,
+    confirmation: ScenarioConfirmation,
     shopping_list_id: int | None,
     mcp_transport: str,
 ) -> tuple[object, list[dict], list[dict]]:
@@ -175,10 +177,10 @@ async def _receipt_stock_flow(
 
 
 async def _receipt_stock_flow_mcp(
-    runner,
-    manifest,
+    runner: _InProcessMcpRunner | _StdioMcpRunner,
+    manifest: ScenarioManifest,
     normalized_items: list[dict],
-    confirmation,
+    confirmation: ScenarioConfirmation,
     products_by_name: dict[str, int],
     shopping_list_id: int | None,
 ) -> tuple[dict, list[dict], list[dict]]:
@@ -236,10 +238,10 @@ async def _pantry_audit_flow(
 
 async def _recipe_url_shopping_flow(
     mode: str,
-    manifest,
+    manifest: ScenarioManifest,
     config: TestbedConfig,
     normalized_items: list[dict],
-    confirmation,
+    confirmation: ScenarioConfirmation,
     shopping_list_id: int | None,
     mcp_transport: str,
 ) -> tuple[object, list[dict], list[dict]]:
@@ -293,10 +295,10 @@ async def _recipe_url_shopping_flow(
 
 
 async def _recipe_url_shopping_flow_mcp(
-    runner,
-    manifest,
+    runner: _InProcessMcpRunner | _StdioMcpRunner,
+    manifest: ScenarioManifest,
     normalized_items: list[dict],
-    confirmation,
+    confirmation: ScenarioConfirmation,
     products_by_name: dict[str, int],
     shopping_list_id: int | None,
 ) -> tuple[object, list[dict], list[dict]]:
@@ -321,7 +323,8 @@ async def _recipe_url_shopping_flow_mcp(
     return preview, confirmation_actions, apply_items
 
 
-def json_dumps(value) -> str:
+def json_dumps(value: object) -> str:
+    """Serialize a value to a compact JSON string."""
     import json
 
     return json.dumps(value)
@@ -334,18 +337,26 @@ async def run_scenario(
     provider_model: str | None = None,
     mcp_transport: str = "in_process",
 ) -> RunReport:
+    """Execute a single testbed scenario end-to-end and return a run report."""
     config = TestbedConfig.from_env()
     manifest, confirmation, expected = load_scenario_bundle(config, scenario_id)
     normalized_items = load_normalized_items(manifest, config, source, provider_model)
     shopping_names = [item.list_name for item in expected.shopping_lists]
 
     start = time.perf_counter()
-    with GrocyAuthProxy(
-        proxy_url=config.proxy_url,
-        backend_base=config.grocy_base_url,
-        api_key=config.proxy_api_key,
-        username=config.admin_username,
-        password=config.admin_password,
+    # Set env vars once for the entire scenario run so that the in-process
+    # MCP runner (and any code reading config from env) sees consistent
+    # values without per-call mutation that would race with the auth-proxy
+    # daemon thread.
+    with (
+        temporary_env({"GROCY_URL": config.proxy_url, "GROCY_API_KEY": config.proxy_api_key}),
+        GrocyAuthProxy(
+            proxy_url=config.proxy_url,
+            backend_base=config.grocy_base_url,
+            api_key=config.proxy_api_key,
+            username=config.admin_username,
+            password=config.admin_password,
+        ),
     ):
         async with GrocyClient(config.proxy_url, config.proxy_api_key) as client:
             state_before = await capture_state(client, shopping_names)

@@ -35,6 +35,7 @@ def _resolve_path(config: TestbedConfig, path: Path) -> Path:
 def load_scenario_bundle(
     config: TestbedConfig, scenario_id: str
 ) -> tuple[ScenarioManifest, ScenarioConfirmation, ExpectedOutcome]:
+    """Load and resolve the manifest, confirmation, and expected outcome for a scenario."""
     manifest = load_manifest(manifest_path(config, scenario_id))
     manifest = manifest.model_copy(
         update={
@@ -60,6 +61,7 @@ def load_normalized_items(
     source: str,
     provider_model: str | None = None,
 ) -> list[dict]:
+    """Load normalized input items from golden fixtures or a provider adapter."""
     if source == "golden":
         payload = read_json(manifest.golden_items_path)
     else:
@@ -91,6 +93,7 @@ def build_stock_apply_items(
     confirmation: ScenarioConfirmation,
     products_by_name: dict[str, int],
 ) -> tuple[list[dict], list[dict]]:
+    """Build apply-ready stock items and confirmation actions from a match preview."""
     resolutions = product_resolution_map(confirmation)
     apply_items: list[dict] = []
     confirmation_actions: list[dict] = []
@@ -137,6 +140,7 @@ def build_stock_apply_items(
 
 
 def flatten_shopping_actions(preview_output: list[dict]) -> list[dict]:
+    """Flatten per-item shopping reconcile actions into a single list."""
     actions: list[dict] = []
     for item in preview_output:
         for action in item.get("actions", []):

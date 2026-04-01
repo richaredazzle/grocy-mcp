@@ -25,6 +25,7 @@ class OpenAICompatibleAdapter(ModelAdapter):
         source_metadata: dict[str, Any],
         prompt_template: str,
     ) -> list[dict]:
+        """Extract normalized grocery items via an OpenAI-compatible endpoint."""
         prompt = build_prompt(task_type, asset_ref, source_metadata, prompt_template)
         headers = {"Content-Type": "application/json"}
         if self.api_key:

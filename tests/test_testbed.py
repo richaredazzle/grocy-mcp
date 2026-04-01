@@ -251,7 +251,8 @@ def test_flatten_shopping_actions_strips_preview_only_fields():
 
 
 @pytest.mark.asyncio
-async def test_run_suite_resets_before_each_scenario(monkeypatch):
+async def test_run_suite_bootstraps_once_then_resets(monkeypatch):
+    bootstrap_calls: list[str] = []
     reset_calls: list[str] = []
     run_mock = AsyncMock()
 
@@ -261,6 +262,10 @@ async def test_run_suite_resets_before_each_scenario(monkeypatch):
     )
     monkeypatch.setattr(
         "testbed.runners.run_suite.ensure_demo_environment",
+        lambda config, seed_profile: bootstrap_calls.append(str(seed_profile)) or [],
+    )
+    monkeypatch.setattr(
+        "testbed.runners.run_suite.reset_demo_data",
         lambda config, seed_profile: reset_calls.append(str(seed_profile)) or [],
     )
     monkeypatch.setattr("testbed.runners.run_suite.run_scenario", run_mock)
@@ -279,5 +284,6 @@ async def test_run_suite_resets_before_each_scenario(monkeypatch):
     warnings = await run_suite("pr")
 
     assert warnings == []
-    assert len(reset_calls) == 2
+    assert len(bootstrap_calls) == 1, "full bootstrap should run exactly once"
+    assert len(reset_calls) == 1, "lightweight reset should run for subsequent scenarios"
     assert run_mock.await_count == 2

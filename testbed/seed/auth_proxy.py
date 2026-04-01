@@ -40,12 +40,9 @@ class _ProxyHandler(BaseHTTPRequestHandler):
             if key.casefold() not in {"host", "content-length", "grocy-api-key"}
         }
         request_url = f"{proxy.backend_base}{self.path}"
-        with httpx.Client(
-            follow_redirects=False,
-            timeout=60.0,
-            cookies=proxy.session.client.cookies,
-        ) as client:
-            response = client.request(self.command, request_url, content=body, headers=headers)
+        response = proxy.http_client.request(
+            self.command, request_url, content=body, headers=headers
+        )
 
         self.send_response(response.status_code)
         for key, value in response.headers.items():
@@ -90,9 +87,15 @@ class GrocyAuthProxy:
         self._server: _ProxyServer | None = None
         self._thread: threading.Thread | None = None
         self.session = GrocySessionClient(self.backend_base, self.username, self.password)
+        self.http_client: httpx.Client | None = None
 
     def __enter__(self) -> GrocyAuthProxy:
         self.session.login()
+        self.http_client = httpx.Client(
+            follow_redirects=False,
+            timeout=60.0,
+            cookies=self.session.client.cookies,
+        )
         parsed = urlparse(self.proxy_url)
         host = parsed.hostname or "127.0.0.1"
         port = parsed.port or 9284
@@ -107,4 +110,6 @@ class GrocyAuthProxy:
             self._server.server_close()
         if self._thread is not None:
             self._thread.join(timeout=5)
+        if self.http_client is not None:
+            self.http_client.close()
         self.session.close()

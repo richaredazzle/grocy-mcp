@@ -10,4 +10,4 @@ services:
       TZ: "UTC"
     volumes:
       - ./runtime/grocy-data:/config
-    restart: unless-stopped
+    restart: "no"

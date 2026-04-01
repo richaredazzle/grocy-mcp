@@ -9,6 +9,7 @@ jobs:
   nightly:
     runs-on: ubuntu-latest
     env:
+      TESTBED_MANAGE_ENV: "true"
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       TESTBED_OPENAI_MODEL: ${{ vars.TESTBED_OPENAI_MODEL }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
