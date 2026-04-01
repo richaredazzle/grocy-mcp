@@ -5,10 +5,9 @@ services:
     ports:
       - "9283:80"
     environment:
-      PUID: "1000"
-      PGID: "1000"
+      PUID: "${TESTBED_PUID:-1000}"
+      PGID: "${TESTBED_PGID:-1000}"
       TZ: "UTC"
     volumes:
       - ./runtime/grocy-data:/config
     restart: unless-stopped
-

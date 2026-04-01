@@ -13,7 +13,7 @@ from testbed.loaders import load_confirmation, load_expected_outcome, load_manif
 from testbed.models import ExpectedOutcome, MutationExpectation, ScenarioConfirmation
 from testbed.runners.common import build_stock_apply_items, flatten_shopping_actions
 from testbed.runners.run_suite import run_suite
-from testbed.seed.manage import _create_named_entities, wait_for_grocy
+from testbed.seed.manage import _compose_env, _create_named_entities, wait_for_grocy
 from testbed.seed.session import _LoginFormParser
 from testbed.utils import TESTBED_DIR
 
@@ -197,6 +197,30 @@ def test_create_named_entities_reuses_existing_names_case_insensitively():
     assert session.create_calls == [
         ("quantity_units", {"name": "carton", "description": "Cartons"})
     ]
+
+
+def test_compose_env_inherits_host_ids(monkeypatch):
+    monkeypatch.setenv("EXISTING_VAR", "present")
+    monkeypatch.setattr("testbed.seed.manage.os.getuid", lambda: 1234, raising=False)
+    monkeypatch.setattr("testbed.seed.manage.os.getgid", lambda: 5678, raising=False)
+
+    env = _compose_env()
+
+    assert env["EXISTING_VAR"] == "present"
+    assert env["TESTBED_PUID"] == "1234"
+    assert env["TESTBED_PGID"] == "5678"
+
+
+def test_compose_env_preserves_explicit_ids(monkeypatch):
+    monkeypatch.setenv("TESTBED_PUID", "1111")
+    monkeypatch.setenv("TESTBED_PGID", "2222")
+    monkeypatch.setattr("testbed.seed.manage.os.getuid", lambda: 1234, raising=False)
+    monkeypatch.setattr("testbed.seed.manage.os.getgid", lambda: 5678, raising=False)
+
+    env = _compose_env()
+
+    assert env["TESTBED_PUID"] == "1111"
+    assert env["TESTBED_PGID"] == "2222"
 
 
 def test_flatten_shopping_actions_strips_preview_only_fields():

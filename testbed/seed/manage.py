@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import sqlite3
 import subprocess
@@ -34,6 +35,17 @@ def _compose_command(config: TestbedConfig, *args: str) -> list[str]:
     return ["docker", "compose", "-f", str(config.testbed_dir / "compose.yaml"), *args]
 
 
+def _compose_env() -> dict[str, str]:
+    env = os.environ.copy()
+    getuid = getattr(os, "getuid", None)
+    getgid = getattr(os, "getgid", None)
+    if callable(getuid):
+        env.setdefault("TESTBED_PUID", str(getuid()))
+    if callable(getgid):
+        env.setdefault("TESTBED_PGID", str(getgid()))
+    return env
+
+
 def reset_runtime_dirs(config: TestbedConfig) -> None:
     for child in ("grocy-data", "reports", "logs"):
         path = config.runtime_dir / child
@@ -50,6 +62,7 @@ def compose_down(config: TestbedConfig) -> None:
         cwd=config.root_dir,
         check=False,
         capture_output=True,
+        env=_compose_env(),
         text=True,
     )
 
@@ -62,6 +75,7 @@ def compose_up(config: TestbedConfig) -> None:
         cwd=config.root_dir,
         check=True,
         capture_output=True,
+        env=_compose_env(),
         text=True,
     )
 
