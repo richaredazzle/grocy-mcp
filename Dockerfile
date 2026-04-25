@@ -15,4 +15,7 @@ RUN pip install --upgrade pip \
 
 EXPOSE 8000
 
-CMD ["grocy-mcp", "--transport", "streamable-http", "--host", "0.0.0.0", "--port", "8000", "--path", "/mcp"]
+# Starts the real FastMCP server on an internal localhost port and exposes an
+# authenticated proxy on 0.0.0.0:8000. Set MCP_ACCESS_TOKEN to require either
+# ?access_token=<token>, Authorization: Bearer <token>, or X-MCP-Access-Token.
+CMD ["python", "-m", "grocy_mcp.auth_proxy"]
